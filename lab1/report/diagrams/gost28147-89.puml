@@ -1,0 +1,49 @@
+@startuml
+title Блок-схема алгоритма ГОСТ 28147-89\n(базовое преобразование блока)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: 64-битный блок,\nключ K[0..7],\nрежим работы;
+:N1 := первые 4 байта блока,\nN2 := последние 4 байта блока;
+:i := 0;
+
+while (i < 32 ?) is (да)
+  if (зашифрование ?) then (да)
+    if (i < 24 ?) then (да)
+      :ключ := K[i mod 8];
+    else (нет)
+      :ключ := K[31 - i];
+    endif
+  else (нет)
+    if (i < 8 ?) then (да)
+      :ключ := K[i];
+    else (нет)
+      :ключ := K[7 - (i mod 8)];
+    endif
+  endif
+
+  :sum := (N1 + ключ) mod 2^32;
+  :res := 0;
+  :j := 0;
+  while (j < 8 ?) is (да)
+    :res := res | (S[j][(sum >> 4j) & 0xF] << 4j);
+    :j := j + 1;
+  endwhile (нет)
+  :res := циклический сдвиг res\nвлево на 11 бит;
+
+  :tmp := N1;
+  :N1 := N2 xor res;
+  :N2 := tmp;
+  :i := i + 1;
+endwhile (нет)
+
+:(N1, N2) := (N2, N1);
+:Выход: блок из N1, N2;
+stop
+
+@enduml

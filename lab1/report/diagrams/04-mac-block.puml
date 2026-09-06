@@ -1,0 +1,30 @@
+@startuml
+title Цикл выработки имитовставки (16-З)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: половины блока N1, N2, ключ K;
+:i := 0;
+while (i < 16 ?) is (да)
+  :подключ := расписание(K, i, зашифрование);
+  note right
+    K0..K7 дважды
+  end note
+  :tmp := N1;
+  :N1 := N2 xor f(N1, подключ);
+  :N2 := tmp;
+  :i := i + 1;
+endwhile (нет)
+:Выход: N1, N2;
+note right
+  финальной перестановки
+  половин нет
+end note
+stop
+
+@enduml

@@ -1,0 +1,32 @@
+@startuml
+title Функция преобразования f
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: половина блока N1,\nраундовый подключ K;
+:sum := (N1 + K) mod 2^32;
+:result := 0;
+:i := 0;
+while (i < 8 ?) is (да)
+  :nibble := (sum >> 4i) & 0xF;
+  note right
+    выделение i-й
+    четвёрки битов
+  end note
+  :result := result | (S[i][nibble] << 4i);
+  note right
+    замена по i-му
+    S-блоку
+  end note
+  :i := i + 1;
+endwhile (нет)
+:result := циклический сдвиг result\nвлево на 11 бит;
+:Выход: result;
+stop
+
+@enduml

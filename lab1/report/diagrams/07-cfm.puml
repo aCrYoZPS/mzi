@@ -1,0 +1,44 @@
+@startuml
+title Режим гаммирования с обратной связью
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: данные, ключ K, режим;
+if (Зашифрование ?) then (да)
+  :выработать случайную\nсинхропосылку S (8 байт);
+  :записать S в начало результата;
+else (нет)
+  :прочитать S из первых\n8 байт шифротекста;
+endif
+:(N1, N2) := S;
+note right
+  без предварительного
+  преобразования
+end note
+
+while (остались необработанные блоки ?) is (да)
+  :(G1, G2) := базовое преобразование(N1, N2, K, зашифрование);
+  :гамма := байты G1, G2;
+  :блок результата := блок xor гамма;
+  if (блок полный (8 байт) ?) then (да)
+    :(N1, N2) := блок шифротекста;
+    note right
+      обратная связь:
+      при зашифровании -
+      выработанный блок,
+      при расшифровании -
+      исходный блок
+    end note
+  else (нет)
+  endif
+  :дописать блок результата;
+endwhile (нет)
+:Выход: результат;
+stop
+
+@enduml

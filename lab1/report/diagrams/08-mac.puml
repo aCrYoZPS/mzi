@@ -1,0 +1,36 @@
+@startuml
+title Выработка имитовставки
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: открытый текст, ключ K,\nдлина имитовставки L (1..32 бит);
+if (Текст пуст ?) then (да)
+  :имитовставка не определена;
+  stop
+else (нет)
+endif
+:дополнить текст нулями\nдо кратности 8 байт;
+:S1 := 0, S2 := 0;
+
+while (остались необработанные блоки ?) is (да)
+  :взять очередные 8 байт;
+  :T1 := первые 4 байта,\nT2 := последние 4 байта;
+  :(S1, S2) := цикл 16-З(S1 xor T1, S2 xor T2, K);
+  note right
+    сложение с накопителем
+    выполняется до
+    преобразования
+  end note
+endwhile (нет)
+
+:маска := младшие L бит;
+:имитовставка := S2 & маска;
+:Выход: имитовставка;
+stop
+
+@enduml

@@ -1,0 +1,44 @@
+@startuml
+title Режим гаммирования
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: данные, ключ K, режим;
+if (Зашифрование ?) then (да)
+  :выработать случайную\nсинхропосылку S (8 байт);
+  :записать S в начало результата;
+else (нет)
+  :прочитать S из первых\n8 байт шифротекста;
+endif
+:(N1, N2) := базовое преобразование(S, K, зашифрование);
+note right
+  инициализация счётчика;
+  гаммой не является
+end note
+
+while (остались необработанные блоки ?) is (да)
+  :N1 := (N1 + 0x01010101) mod 2^32;
+  :N2 := (N2 + 0x01010104) mod (2^32 - 1);
+  :(G1, G2) := базовое преобразование(N1, N2, K, зашифрование);
+  note right
+    гамма вырабатывается
+    только прямым
+    преобразованием
+  end note
+  :гамма := байты G1, G2;
+  :дописать в результат\nблок xor гамма;
+  note right
+    неполный блок
+    складывается с
+    усечённой гаммой
+  end note
+endwhile (нет)
+:Выход: результат;
+stop
+
+@enduml

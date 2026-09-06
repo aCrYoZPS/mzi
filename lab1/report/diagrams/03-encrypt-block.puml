@@ -1,0 +1,28 @@
+@startuml
+title Базовое преобразование блока (циклы 32-З и 32-Р)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: половины блока N1, N2,\nключ K, режим;
+:i := 0;
+while (i < 32 ?) is (да)
+  :подключ := расписание(K, i, режим);
+  :tmp := N1;
+  :N1 := N2 xor f(N1, подключ);
+  :N2 := tmp;
+  :i := i + 1;
+endwhile (нет)
+:перестановка половин:\n(N1, N2) := (N2, N1);
+note right
+  эквивалент 32-го раунда
+  без обмена половин
+end note
+:Выход: N1, N2;
+stop
+
+@enduml

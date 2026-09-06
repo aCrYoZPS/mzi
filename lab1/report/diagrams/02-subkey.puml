@@ -1,0 +1,40 @@
+@startuml
+title Расписание раундовых ключей
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: ключ K[0..7],\nномер раунда i (0..31),\nрежим (зашифрование/расшифрование);
+if (Зашифрование ?) then (да)
+  if (i < 24 ?) then (да)
+    :подключ := K[i mod 8];
+    note right
+      K0..K7 трижды
+    end note
+  else (нет)
+    :подключ := K[31 - i];
+    note right
+      K7..K0
+    end note
+  endif
+else (нет)
+  if (i < 8 ?) then (да)
+    :подключ := K[i];
+    note right
+      K0..K7
+    end note
+  else (нет)
+    :подключ := K[7 - (i mod 8)];
+    note right
+      K7..K0 трижды
+    end note
+  endif
+endif
+:Выход: подключ;
+stop
+
+@enduml

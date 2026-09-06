@@ -23,10 +23,23 @@ const FOUR_BIT_MASKS: [u32; 8] = [
 const C1: u32 = 0x01010104;
 const C2: u32 = 0x01010101;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Gost28147_89Type {
     ECB,
     CTR,
     CFM,
+}
+
+impl Display for Gost28147_89Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Gost28147_89Type::ECB => "ECB",
+            Gost28147_89Type::CTR => "CTR",
+            Gost28147_89Type::CFM => "CFM",
+        };
+
+        return write!(f, "{name}");
+    }
 }
 
 pub struct Gost28147_89 {}
@@ -115,13 +128,13 @@ impl Gost28147_89 {
             let b_bytes = block[(BLOCK_SIZE / 2)..]
                 .try_into()
                 .expect("u32 can only be constructed from [u8;4]");
-            let mut a = u32::from_ne_bytes(a_bytes);
-            let mut b = u32::from_ne_bytes(b_bytes);
+            let mut a = u32::from_le_bytes(a_bytes);
+            let mut b = u32::from_le_bytes(b_bytes);
 
             (a, b) = Self::encrypt_block(a, b, key, encrypt);
 
-            result.extend_from_slice(&a.to_ne_bytes());
-            result.extend_from_slice(&b.to_ne_bytes());
+            result.extend_from_slice(&a.to_le_bytes());
+            result.extend_from_slice(&b.to_le_bytes());
         }
 
         return result;
@@ -158,24 +171,24 @@ impl Gost28147_89 {
         let s_a: u32 = rng.random();
         let s_b: u32 = rng.random();
 
-        result.extend_from_slice(&s_a.to_ne_bytes());
-        result.extend_from_slice(&s_b.to_ne_bytes());
+        result.extend_from_slice(&s_a.to_le_bytes());
+        result.extend_from_slice(&s_b.to_le_bytes());
 
         let (mut n_1, mut n_2) = Self::encrypt_block(s_a, s_b, key, true);
 
         let blocks = plain_bytes.chunks(BLOCK_SIZE);
         for block in blocks {
-            n_1 = n_1.wrapping_add(C1);
+            n_1 = n_1.wrapping_add(C2);
             n_2 = {
-                let (sum, carry) = n_2.overflowing_add(C2);
+                let (sum, carry) = n_2.overflowing_add(C1);
                 sum + carry as u32
             };
 
             let (g_1, g_2) = Self::encrypt_block(n_1, n_2, key, true);
 
             let mut gamma: Vec<u8> = vec![];
-            gamma.extend_from_slice(&g_1.to_ne_bytes());
-            gamma.extend_from_slice(&g_2.to_ne_bytes());
+            gamma.extend_from_slice(&g_1.to_le_bytes());
+            gamma.extend_from_slice(&g_2.to_le_bytes());
 
             for (idx, byte) in block.iter().enumerate() {
                 result.push(byte ^ gamma[idx]);
@@ -188,12 +201,12 @@ impl Gost28147_89 {
     pub fn decrypt_ctr(encrypted_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
         let mut result: Vec<u8> = vec![];
 
-        let s_a = u32::from_ne_bytes(
+        let s_a = u32::from_le_bytes(
             encrypted_bytes[..4]
                 .try_into()
                 .expect("u32 can only be constructed from [u8;4]"),
         );
-        let s_b = u32::from_ne_bytes(
+        let s_b = u32::from_le_bytes(
             encrypted_bytes[4..8]
                 .try_into()
                 .expect("u32 can only be constructed from [u8;4]"),
@@ -203,17 +216,17 @@ impl Gost28147_89 {
 
         let blocks = encrypted_bytes[8..].chunks(BLOCK_SIZE);
         for block in blocks {
-            n_1 = n_1.wrapping_add(C1);
+            n_1 = n_1.wrapping_add(C2);
             n_2 = {
-                let (sum, carry) = n_2.overflowing_add(C2);
+                let (sum, carry) = n_2.overflowing_add(C1);
                 sum + carry as u32
             };
 
             let (g_1, g_2) = Self::encrypt_block(n_1, n_2, key, true);
 
             let mut gamma: Vec<u8> = vec![];
-            gamma.extend_from_slice(&g_1.to_ne_bytes());
-            gamma.extend_from_slice(&g_2.to_ne_bytes());
+            gamma.extend_from_slice(&g_1.to_le_bytes());
+            gamma.extend_from_slice(&g_2.to_le_bytes());
 
             for (idx, byte) in block.iter().enumerate() {
                 result.push(byte ^ gamma[idx]);
@@ -221,6 +234,17 @@ impl Gost28147_89 {
         }
 
         return result;
+    }
+
+    fn split_block(block: &[u8]) -> (u32, u32) {
+        let a_bytes = block[..(BLOCK_SIZE / 2)]
+            .try_into()
+            .expect("u32 can only be constructed from [u8;4]");
+        let b_bytes = block[(BLOCK_SIZE / 2)..BLOCK_SIZE]
+            .try_into()
+            .expect("u32 can only be constructed from [u8;4]");
+
+        return (u32::from_le_bytes(a_bytes), u32::from_le_bytes(b_bytes));
     }
 
     pub fn encrypt_cfm(plain_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
@@ -229,21 +253,29 @@ impl Gost28147_89 {
         let s_a: u32 = rng.random();
         let s_b: u32 = rng.random();
 
-        result.extend_from_slice(&s_a.to_ne_bytes());
-        result.extend_from_slice(&s_b.to_ne_bytes());
+        result.extend_from_slice(&s_a.to_le_bytes());
+        result.extend_from_slice(&s_b.to_le_bytes());
 
-        let (n_1, n_2) = Self::encrypt_block(s_a, s_b, key, true);
-        let mut gamma: Vec<u8> = vec![];
-        gamma.extend_from_slice(&n_1.to_ne_bytes());
-        gamma.extend_from_slice(&n_2.to_ne_bytes());
+        let (mut n_1, mut n_2) = (s_a, s_b);
 
         let blocks = plain_bytes.chunks(BLOCK_SIZE);
         for block in blocks {
+            let (g_1, g_2) = Self::encrypt_block(n_1, n_2, key, true);
+
+            let mut gamma: Vec<u8> = vec![];
+            gamma.extend_from_slice(&g_1.to_le_bytes());
+            gamma.extend_from_slice(&g_2.to_le_bytes());
+
+            let mut encrypted_block: Vec<u8> = Vec::with_capacity(block.len());
             for (idx, byte) in block.iter().enumerate() {
-                result.push(byte ^ gamma[idx]);
-                let result_offset = result.len();
-                gamma[idx] = result[result_offset - 1];
+                encrypted_block.push(byte ^ gamma[idx]);
             }
+
+            if encrypted_block.len() == BLOCK_SIZE {
+                (n_1, n_2) = Self::split_block(&encrypted_block);
+            }
+
+            result.extend_from_slice(&encrypted_block);
         }
 
         return result;
@@ -252,28 +284,22 @@ impl Gost28147_89 {
     pub fn decrypt_cfm(encrypted_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
         let mut result: Vec<u8> = vec![];
 
-        let s_a = u32::from_ne_bytes(
-            encrypted_bytes[..4]
-                .try_into()
-                .expect("u32 can only be constructed from [u8;4]"),
-        );
-        let s_b = u32::from_ne_bytes(
-            encrypted_bytes[4..8]
-                .try_into()
-                .expect("u32 can only be constructed from [u8;4]"),
-        );
+        let (mut n_1, mut n_2) = Self::split_block(&encrypted_bytes[..BLOCK_SIZE]);
 
-        let (n_1, n_2) = Self::encrypt_block(s_a, s_b, key, true);
-        let mut gamma: Vec<u8> = vec![];
-        gamma.extend_from_slice(&n_1.to_ne_bytes());
-        gamma.extend_from_slice(&n_2.to_ne_bytes());
-
-        let blocks = encrypted_bytes[8..].chunks(BLOCK_SIZE);
+        let blocks = encrypted_bytes[BLOCK_SIZE..].chunks(BLOCK_SIZE);
         for block in blocks {
+            let (g_1, g_2) = Self::encrypt_block(n_1, n_2, key, true);
+
+            let mut gamma: Vec<u8> = vec![];
+            gamma.extend_from_slice(&g_1.to_le_bytes());
+            gamma.extend_from_slice(&g_2.to_le_bytes());
+
             for (idx, byte) in block.iter().enumerate() {
-                let byte_copy = byte;
                 result.push(byte ^ gamma[idx]);
-                gamma[idx] = *byte_copy;
+            }
+
+            if block.len() == BLOCK_SIZE {
+                (n_1, n_2) = Self::split_block(block);
             }
         }
 
@@ -304,12 +330,12 @@ impl Gost28147_89 {
         let blocks = plain_bytes.chunks(BLOCK_SIZE);
         for block in blocks {
             let (n_1, n_2) = (
-                u32::from_ne_bytes(
+                u32::from_le_bytes(
                     block[..(BLOCK_SIZE / 2)]
                         .try_into()
                         .expect("failed to compute mac"),
                 ),
-                u32::from_ne_bytes(
+                u32::from_le_bytes(
                     block[(BLOCK_SIZE / 2)..]
                         .try_into()
                         .expect("failed to compute mac"),
