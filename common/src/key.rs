@@ -1,5 +1,6 @@
 use std::{fmt::Display, ops::Index};
 
+#[derive(Clone, Copy)]
 pub struct Key<const N: usize>(pub [u32; N]);
 
 impl<const N: usize> Index<usize> for Key<N> {

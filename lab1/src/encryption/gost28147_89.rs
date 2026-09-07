@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Index, vec};
+use std::{fmt::Display, vec};
 
 use common::key::Key;
 use rand::RngExt;
