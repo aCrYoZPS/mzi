@@ -20,6 +20,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+
+[[package]]
 name = "cpufeatures"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -38,6 +42,14 @@ dependencies = [
  "libc",
  "r-efi",
  "rand_core",
+]
+
+[[package]]
+name = "lab1"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "rand",
 ]
 
 [[package]]

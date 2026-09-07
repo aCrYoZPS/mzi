@@ -1,13 +1,14 @@
 mod encryption;
+use common::key::Key;
 use encryption::gost28147_89::*;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-const KEY: Gost28147_89Key = Gost28147_89Key([1, 2, 3, 4, 5, 6, 7, 8]);
+const KEY: Key<8> = Key([1, 2, 3, 4, 5, 6, 7, 8]);
 const DEFAULT_MAC_BITS: usize = 32;
 const ENCRYPTED_EXTENSION: &str = "gost";
-type CipherFn = fn(Vec<u8>, &Gost28147_89Key) -> Vec<u8>;
+type CipherFn = fn(Vec<u8>, &Key<8>) -> Vec<u8>;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum IoMode {
@@ -185,7 +186,7 @@ fn run_cipher(
     io_mode: IoMode,
     encrypt: bool,
     encryption_type: Gost28147_89Type,
-    key: &Gost28147_89Key,
+    key: &Key<8>,
 ) -> Result<(), String> {
     let (encrypt_fn, decrypt_fn) = cipher_fns(encryption_type);
     let cipher_fn = if encrypt { encrypt_fn } else { decrypt_fn };
@@ -243,7 +244,7 @@ fn run_cipher(
     return Ok(());
 }
 
-fn run_mac(io_mode: IoMode, key: &Gost28147_89Key) -> Result<(), String> {
+fn run_mac(io_mode: IoMode, key: &Key<8>) -> Result<(), String> {
     let (message, source) = read_payload(io_mode, true)?;
 
     let bits_input = prompt(&format!("MAC length in bits [{DEFAULT_MAC_BITS}]: "));
@@ -272,7 +273,7 @@ fn run_mac(io_mode: IoMode, key: &Gost28147_89Key) -> Result<(), String> {
     return Ok(());
 }
 
-fn parse_key(hex_key: &str) -> Result<Gost28147_89Key, String> {
+fn parse_key(hex_key: &str) -> Result<Key<8>, String> {
     if hex_key.len() != 64 {
         return Err("valid key should be 256 bits (64 characters)".to_string());
     }
@@ -283,7 +284,7 @@ fn parse_key(hex_key: &str) -> Result<Gost28147_89Key, String> {
         new_key[idx] = u32::from_be_bytes(word.try_into().expect("64 hex digits give 8 words"));
     }
 
-    return Ok(Gost28147_89Key(new_key));
+    return Ok(Key(new_key));
 }
 
 fn main() {

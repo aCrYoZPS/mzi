@@ -1,5 +1,6 @@
 use std::{fmt::Display, ops::Index, vec};
 
+use common::key::Key;
 use rand::RngExt;
 
 const BLOCK_SIZE: usize = 8;
@@ -44,28 +45,8 @@ impl Display for Gost28147_89Type {
 
 pub struct Gost28147_89 {}
 
-pub struct Gost28147_89Key(pub [u32; 8]);
-
-impl Index<usize> for Gost28147_89Key {
-    type Output = u32;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl Display for Gost28147_89Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for &word in &self.0 {
-            write!(f, "{:08X}", word)?;
-        }
-
-        Ok(())
-    }
-}
-
 impl Gost28147_89 {
-    fn get_subkey(key: &Gost28147_89Key, idx: usize, encrypt: bool) -> u32 {
+    fn get_subkey(key: &Key<8>, idx: usize, encrypt: bool) -> u32 {
         if idx > 31 {
             panic!("invalid index on K_{idx}")
         }
@@ -101,7 +82,7 @@ impl Gost28147_89 {
         return (b ^ Self::f(a, subkey), a);
     }
 
-    fn encrypt_block(mut a: u32, mut b: u32, key: &Gost28147_89Key, encrypt: bool) -> (u32, u32) {
+    fn encrypt_block(mut a: u32, mut b: u32, key: &Key<8>, encrypt: bool) -> (u32, u32) {
         for iteration in 0..ITERATIONS {
             (a, b) = Self::round(a, b, Self::get_subkey(&key, iteration, encrypt));
         }
@@ -109,7 +90,7 @@ impl Gost28147_89 {
         return (b, a);
     }
 
-    fn mac_block(mut a: u32, mut b: u32, key: &Gost28147_89Key) -> (u32, u32) {
+    fn mac_block(mut a: u32, mut b: u32, key: &Key<8>) -> (u32, u32) {
         for iteration in 0..MAC_ITERATIONS {
             (a, b) = Self::round(a, b, Self::get_subkey(&key, iteration, true));
         }
@@ -117,7 +98,7 @@ impl Gost28147_89 {
         return (a, b);
     }
 
-    fn apply_algo(bytes: Vec<u8>, key: &Gost28147_89Key, encrypt: bool) -> Vec<u8> {
+    fn apply_algo(bytes: Vec<u8>, key: &Key<8>, encrypt: bool) -> Vec<u8> {
         let blocks = bytes.chunks(BLOCK_SIZE);
         let mut result: Vec<u8> = vec![];
 
@@ -140,7 +121,7 @@ impl Gost28147_89 {
         return result;
     }
 
-    pub fn encrypt_ecb(mut plain_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
+    pub fn encrypt_ecb(mut plain_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
         let padding = {
             let pd = 8 - plain_bytes.len() % 8;
             if pd == 8 { 0 } else { pd }
@@ -154,7 +135,7 @@ impl Gost28147_89 {
 
         return result;
     }
-    pub fn decrypt_ecb(mut encrypted_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
+    pub fn decrypt_ecb(mut encrypted_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
         let padding = encrypted_bytes.pop().unwrap_or(0) as usize;
 
         let mut result = Self::apply_algo(encrypted_bytes, key, false);
@@ -165,7 +146,7 @@ impl Gost28147_89 {
         return result;
     }
 
-    pub fn encrypt_ctr(plain_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
+    pub fn encrypt_ctr(plain_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
         let mut result: Vec<u8> = vec![];
         let mut rng = rand::rng();
         let s_a: u32 = rng.random();
@@ -198,7 +179,7 @@ impl Gost28147_89 {
         return result;
     }
 
-    pub fn decrypt_ctr(encrypted_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
+    pub fn decrypt_ctr(encrypted_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
         let mut result: Vec<u8> = vec![];
 
         let s_a = u32::from_le_bytes(
@@ -247,7 +228,7 @@ impl Gost28147_89 {
         return (u32::from_le_bytes(a_bytes), u32::from_le_bytes(b_bytes));
     }
 
-    pub fn encrypt_cfm(plain_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
+    pub fn encrypt_cfm(plain_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
         let mut result: Vec<u8> = vec![];
         let mut rng = rand::rng();
         let s_a: u32 = rng.random();
@@ -281,7 +262,7 @@ impl Gost28147_89 {
         return result;
     }
 
-    pub fn decrypt_cfm(encrypted_bytes: Vec<u8>, key: &Gost28147_89Key) -> Vec<u8> {
+    pub fn decrypt_cfm(encrypted_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
         let mut result: Vec<u8> = vec![];
 
         let (mut n_1, mut n_2) = Self::split_block(&encrypted_bytes[..BLOCK_SIZE]);
@@ -306,11 +287,7 @@ impl Gost28147_89 {
         return result;
     }
 
-    pub fn compute_mac(
-        mut plain_bytes: Vec<u8>,
-        key: &Gost28147_89Key,
-        mac_bits: usize,
-    ) -> Option<u32> {
+    pub fn compute_mac(mut plain_bytes: Vec<u8>, key: &Key<8>, mac_bits: usize) -> Option<u32> {
         if mac_bits == 0 || mac_bits > MAX_MAC_BITS {
             panic!("mac bits must be in 1..={MAX_MAC_BITS}, got {mac_bits}")
         }
