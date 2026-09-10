@@ -91,7 +91,7 @@ pub fn parse_key(hex_key: &str) -> Result<Key<8>, String> {
     let bytes = from_hex(hex_key)?;
     let mut new_key = [0u32; 8];
     for (idx, word) in bytes.chunks(4).enumerate() {
-        new_key[idx] = u32::from_be_bytes(word.try_into().expect("64 hex digits give 8 words"));
+        new_key[idx] = u32::from_le_bytes(word.try_into().expect("64 hex digits give 8 words"));
     }
 
     return Ok(Key(new_key));
@@ -108,7 +108,9 @@ pub fn check_ecb_padding(bytes: &[u8], mode: &str, block_size: usize) -> Result<
 
     let padding = bytes[bytes.len() - 1] as usize;
     if padding >= block_size || (padding > 0 && bytes.len() == 1) {
-        return Err(format!("invalid padding byte {padding} in {mode} ciphertext"));
+        return Err(format!(
+            "invalid padding byte {padding} in {mode} ciphertext"
+        ));
     }
 
     return Ok(());
