@@ -287,7 +287,7 @@ impl Gost28147_89 {
         return result;
     }
 
-    pub fn compute_mac(mut plain_bytes: Vec<u8>, key: &Key<8>, mac_bits: usize) -> Option<u32> {
+    pub fn compute_mac(mut plain_bytes: Vec<u8>, key: &Key<8>, mac_bits: usize) -> Option<u64> {
         if mac_bits == 0 || mac_bits > MAX_MAC_BITS {
             panic!("mac bits must be in 1..={MAX_MAC_BITS}, got {mac_bits}")
         }
@@ -322,8 +322,8 @@ impl Gost28147_89 {
             (s_1, s_2) = Self::mac_block(n_1 ^ s_1, n_2 ^ s_2, key);
         }
 
-        let mac_mask: u32 = u32::MAX >> (32 - mac_bits);
+        let mac_mask: u64 = u64::MAX >> (64 - mac_bits);
 
-        return Some(s_2 & mac_mask);
+        return Some(s_2 as u64 & mac_mask);
     }
 }

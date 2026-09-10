@@ -1,5 +1,5 @@
 mod encryption;
-use common::cli::{self, CheckFn, CipherApp, CipherFn, CipherMode, MacSpec};
+use common::cli::{self, CipherApp, CipherFn, CipherMode, MacSpec};
 use common::key::Key;
 use encryption::gost28147_89::*;
 
@@ -16,12 +16,24 @@ fn cipher_fns(encryption_type: Gost28147_89Type) -> (CipherFn, CipherFn) {
     };
 }
 
-fn check_ecb(bytes: &[u8], mode: &str) -> Result<(), String> {
-    return cli::check_ecb_padding(bytes, mode, BLOCK_SIZE);
-}
+/// ECB zero-pads the plaintext and appends the number of added bytes, so the
+/// ciphertext is a whole number of blocks plus that one byte.
+fn check_padded_blocks(bytes: &[u8]) -> Result<(), String> {
+    if bytes.len() <= BLOCK_SIZE || (bytes.len() - 1) % BLOCK_SIZE != 0 {
+        return Err(format!(
+            "expected whole {BLOCK_SIZE}-byte blocks plus one padding byte, got {} bytes",
+            bytes.len()
+        ));
+    }
 
-fn check_sync(bytes: &[u8], mode: &str) -> Result<(), String> {
-    return cli::check_sync_prefix(bytes, mode, BLOCK_SIZE);
+    let padding = bytes[bytes.len() - 1] as usize;
+    if padding >= BLOCK_SIZE {
+        return Err(format!(
+            "invalid padding byte {padding}, expected less than {BLOCK_SIZE}"
+        ));
+    }
+
+    return Ok(());
 }
 
 fn modes() -> Vec<CipherMode> {
@@ -33,17 +45,13 @@ fn modes() -> Vec<CipherMode> {
     .into_iter()
     .map(|encryption_type| {
         let (encrypt, decrypt) = cipher_fns(encryption_type);
+        let mode = CipherMode::new(encryption_type.to_string(), encrypt, decrypt);
 
-        CipherMode {
-            name: encryption_type.to_string(),
-            encrypt,
-            decrypt,
-            check_ciphertext: Some(if encryption_type == Gost28147_89Type::ECB {
-                check_ecb as CheckFn
-            } else {
-                check_sync as CheckFn
-            }),
-        }
+        return match encryption_type {
+            Gost28147_89Type::ECB => mode.checking_ciphertext(check_padded_blocks),
+            // the gamma modes prepend the sync value and keep the length
+            _ => mode.checking_ciphertext(cli::at_least(BLOCK_SIZE)),
+        };
     })
     .collect();
 }
@@ -58,6 +66,7 @@ fn main() {
             default_bits: DEFAULT_MAC_BITS,
             max_bits: MAX_MAC_BITS,
         }),
+        digest: None,
         default_key: KEY,
     }
     .run();

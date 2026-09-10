@@ -5,14 +5,54 @@ use std::path::{Path, PathBuf};
 use crate::key::Key;
 
 pub type CipherFn = fn(Vec<u8>, &Key<8>) -> Vec<u8>;
-pub type CheckFn = fn(&[u8], &str) -> Result<(), String>;
-pub type MacFn = fn(Vec<u8>, &Key<8>, usize) -> Option<u32>;
+pub type MacFn = fn(Vec<u8>, &Key<8>, usize) -> Option<u64>;
+/// Keyless, arbitrary width — a hash, unlike the keyed and truncatable MAC.
+pub type DigestFn = fn(Vec<u8>) -> Vec<u8>;
+
+/// A payload validation supplied by the cipher: it knows the block size, the
+/// framing and the padding of its own mode, the CLI only reports what it says.
+pub type Check = Box<dyn Fn(&[u8]) -> Result<(), String>>;
 
 pub struct CipherMode {
     pub name: String,
     pub encrypt: CipherFn,
     pub decrypt: CipherFn,
-    pub check_ciphertext: Option<CheckFn>,
+    pub plaintext_check: Option<Check>,
+    pub ciphertext_check: Option<Check>,
+}
+
+impl CipherMode {
+    pub fn new(name: impl Into<String>, encrypt: CipherFn, decrypt: CipherFn) -> Self {
+        return CipherMode {
+            name: name.into(),
+            encrypt,
+            decrypt,
+            plaintext_check: None,
+            ciphertext_check: None,
+        };
+    }
+
+    /// Runs before encryption, e.g. to reject inputs a ciphertext stealing mode
+    /// is too short to process.
+    pub fn checking_plaintext(
+        mut self,
+        check: impl Fn(&[u8]) -> Result<(), String> + 'static,
+    ) -> Self {
+        self.plaintext_check = Some(Box::new(check));
+
+        return self;
+    }
+
+    /// Runs before decryption, e.g. to reject a ciphertext that cannot hold the
+    /// framing the mode adds (a sync value, a padding byte).
+    pub fn checking_ciphertext(
+        mut self,
+        check: impl Fn(&[u8]) -> Result<(), String> + 'static,
+    ) -> Self {
+        self.ciphertext_check = Some(Box::new(check));
+
+        return self;
+    }
 }
 
 pub struct MacSpec {
@@ -21,12 +61,48 @@ pub struct MacSpec {
     pub max_bits: usize,
 }
 
+pub struct DigestSpec {
+    pub name: &'static str,
+    pub compute: DigestFn,
+}
+
 pub struct CipherApp {
     pub title: &'static str,
     pub encrypted_extension: &'static str,
     pub modes: Vec<CipherMode>,
     pub mac: Option<MacSpec>,
+    pub digest: Option<DigestSpec>,
     pub default_key: Key<8>,
+}
+
+/// The menu entries that follow the per-mode encrypt/decrypt pairs.
+enum Extra<'a> {
+    Mac(&'a MacSpec),
+    Digest(&'a DigestSpec),
+}
+
+impl Extra<'_> {
+    fn label(&self) -> &'static str {
+        match self {
+            Extra::Mac(_) => "MAC",
+            Extra::Digest(digest) => digest.name,
+        }
+    }
+}
+
+/// The one length rule every mode expresses in some form: a lower bound in
+/// bytes. What the bound means is up to the caller.
+pub fn at_least(min: usize) -> impl Fn(&[u8]) -> Result<(), String> {
+    return move |bytes: &[u8]| {
+        if bytes.len() < min {
+            return Err(format!(
+                "expected at least {min} bytes, got {}",
+                bytes.len()
+            ));
+        }
+
+        return Ok(());
+    };
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -95,38 +171,6 @@ pub fn parse_key(hex_key: &str) -> Result<Key<8>, String> {
     }
 
     return Ok(Key(new_key));
-}
-
-/// Ciphertext produced by a padded ECB mode: whole blocks plus a trailing padding byte.
-pub fn check_ecb_padding(bytes: &[u8], mode: &str, block_size: usize) -> Result<(), String> {
-    return Ok(());
-    if bytes.is_empty() || (bytes.len() - 1) % block_size != 0 {
-        return Err(format!(
-            "{mode} ciphertext must be a whole number of {block_size}-byte blocks plus one padding byte, got {} bytes",
-            bytes.len()
-        ));
-    }
-
-    let padding = bytes[bytes.len() - 1] as usize;
-    if padding >= block_size || (padding > 0 && bytes.len() == 1) {
-        return Err(format!(
-            "invalid padding byte {padding} in {mode} ciphertext"
-        ));
-    }
-
-    return Ok(());
-}
-
-/// Ciphertext produced by a gamma mode: a leading sync value followed by the gamma stream.
-pub fn check_sync_prefix(bytes: &[u8], mode: &str, block_size: usize) -> Result<(), String> {
-    if bytes.len() < block_size {
-        return Err(format!(
-            "{mode} ciphertext must start with a {block_size}-byte sync value, got {} bytes",
-            bytes.len()
-        ));
-    }
-
-    return Ok(());
 }
 
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
@@ -230,8 +274,14 @@ impl CipherApp {
         if input.is_empty() {
             return Err("nothing to process: the input is empty".to_string());
         }
-        if !encrypt && let Some(check) = mode.check_ciphertext {
-            check(&input, &mode.name)?;
+
+        let (check, kind) = if encrypt {
+            (&mode.plaintext_check, "plaintext")
+        } else {
+            (&mode.ciphertext_check, "ciphertext")
+        };
+        if let Some(check) = check {
+            check(&input).map_err(|err| format!("{} {kind}: {err}", mode.name))?;
         }
 
         let destination = match &source {
@@ -305,9 +355,43 @@ impl CipherApp {
             Some(path) => println!("  message : {} ({} bytes)", path.display(), message.len()),
             None => println!("  message : {} bytes", message.len()),
         }
-        println!("  mac     : {mac_value:08X} ({mac_bits} bits)");
+        println!(
+            "  mac     : {mac_value:0width$X} ({mac_bits} bits)",
+            width = mac_bits.div_ceil(4)
+        );
 
         return Ok(());
+    }
+
+    fn run_digest(&self, io_mode: IoMode, digest: &DigestSpec) -> Result<(), String> {
+        let (message, source) = self.read_payload(io_mode, true)?;
+
+        let value = (digest.compute)(message.clone());
+
+        match source {
+            Some(path) => println!("  message : {} ({} bytes)", path.display(), message.len()),
+            None => println!("  message : {} bytes", message.len()),
+        }
+        println!(
+            "  {:<8}: {} ({} bits)",
+            digest.name,
+            to_hex(&value),
+            value.len() * 8
+        );
+
+        return Ok(());
+    }
+
+    fn extras(&self) -> Vec<Extra<'_>> {
+        let mut extras: Vec<Extra<'_>> = Vec::new();
+        if let Some(mac) = &self.mac {
+            extras.push(Extra::Mac(mac));
+        }
+        if let Some(digest) = &self.digest {
+            extras.push(Extra::Digest(digest));
+        }
+
+        return extras;
     }
 
     fn print_menu(&self, io_mode: IoMode) {
@@ -319,8 +403,8 @@ impl CipherApp {
             let left = format!("{}) encrypt ({})", idx + 1, mode.name);
             println!("{left:<22}{}) decrypt ({})", idx + 1 + modes, mode.name);
         }
-        if self.mac.is_some() {
-            println!("{}) MAC", 2 * modes + 1);
+        for (idx, extra) in self.extras().iter().enumerate() {
+            println!("{}) {}", 2 * modes + 1 + idx, extra.label());
         }
     }
 
@@ -328,6 +412,7 @@ impl CipherApp {
         let mut key = self.default_key;
         let mut io_mode = IoMode::Text;
         let modes = self.modes.len();
+        let extras = self.extras();
 
         loop {
             self.print_menu(io_mode);
@@ -365,9 +450,11 @@ impl CipherApp {
                     Ok(n) if (modes + 1..=2 * modes).contains(&n) => {
                         self.run_cipher(io_mode, false, &self.modes[n - modes - 1], &key)
                     }
-                    Ok(n) if n == 2 * modes + 1 && self.mac.is_some() => {
-                        let mac = self.mac.as_ref().expect("checked to be present");
-                        self.run_mac(io_mode, mac, &key)
+                    Ok(n) if (2 * modes + 1..=2 * modes + extras.len()).contains(&n) => {
+                        match extras[n - 2 * modes - 1] {
+                            Extra::Mac(mac) => self.run_mac(io_mode, mac, &key),
+                            Extra::Digest(digest) => self.run_digest(io_mode, digest),
+                        }
                     }
                     _ => Err(format!("unknown choice: {choice:?}")),
                 },
