@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use common::key::Key;
+use rand::random;
 
 const BLOCK_SIZE: usize = 16;
 const ITERATIONS: usize = 8;
@@ -151,30 +152,140 @@ impl BelT {
         return result;
     }
 
-    pub fn encrypt_ecb(mut plain_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
-        let padding = {
-            let pd = BLOCK_SIZE - plain_bytes.len() % BLOCK_SIZE;
-            if pd == BLOCK_SIZE { 0 } else { pd }
+    fn apply_ecb(bytes: Vec<u8>, key: &Key<8>, encrypt: bool) -> Vec<u8> {
+        let full = bytes.len() / BLOCK_SIZE;
+        let rest = bytes.len() % BLOCK_SIZE;
+
+        let apply = |n: u128| {
+            if encrypt {
+                Self::encrypt_block(n, key)
+            } else {
+                Self::decrypt_block(n, key)
+            }
         };
-        for _ in 0..padding {
-            plain_bytes.push(0);
+
+        let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
+
+        for (idx, block) in bytes.chunks(BLOCK_SIZE).enumerate() {
+            if idx == full {
+                break;
+            }
+
+            let n = Self::block_from(block);
+            let processed = apply(n);
+            result.extend_from_slice(&processed.to_le_bytes());
         }
 
-        let mut result = Self::apply_algo(plain_bytes, key, true);
-        result.push(padding as u8);
+        if rest != 0 {
+            let second_to_last_block_start = (full - 1) * BLOCK_SIZE;
+            let last_block_start = full * BLOCK_SIZE;
+            result.resize(result.len() + rest, 0);
+            result[last_block_start..].copy_from_slice(&bytes[last_block_start..]);
+            for j in 0..rest {
+                result.swap(last_block_start + j, second_to_last_block_start + j);
+            }
+            let processed = apply(Self::block_from(
+                &result[second_to_last_block_start..last_block_start],
+            ));
+            result[second_to_last_block_start..last_block_start]
+                .copy_from_slice(&processed.to_le_bytes());
+        }
 
         return result;
     }
 
-    pub fn decrypt_ecb(mut encrypted_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
-        let padding = encrypted_bytes.pop().unwrap_or(0) as usize;
+    pub fn encrypt_ecb(plain_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
+        return Self::apply_ecb(plain_bytes, key, true);
+    }
 
-        let mut result = Self::apply_algo(encrypted_bytes, key, false);
-        for _ in 0..padding {
-            result.pop();
+    pub fn decrypt_ecb(encrypted_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
+        return Self::apply_ecb(encrypted_bytes, key, false);
+    }
+
+    fn apply_cbc(bytes: Vec<u8>, key: &Key<8>, iv: u128, encrypt: bool) -> Vec<u8> {
+        let full = bytes.len() / BLOCK_SIZE;
+        let rest = bytes.len() % BLOCK_SIZE;
+
+        let apply = |n: u128| {
+            if encrypt {
+                Self::encrypt_block(n, key)
+            } else {
+                Self::decrypt_block(n, key)
+            }
+        };
+
+        let mut prev: u128 = iv;
+        let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
+
+        for (idx, block) in bytes.chunks(BLOCK_SIZE).enumerate() {
+            if idx == full - 1 {
+                break;
+            }
+
+            let x = Self::block_from(block);
+            let y = if encrypt {
+                apply(x ^ prev)
+            } else {
+                apply(x) ^ prev
+            };
+            result.extend_from_slice(&y.to_le_bytes());
+
+            prev = if encrypt { y } else { x };
         }
 
+        if rest == 0 {
+            return result;
+        }
+
+        let second_to_last_block_start = (full - 1) * BLOCK_SIZE;
+        let last_block_start = full * BLOCK_SIZE;
+
+        let x_n_m_1 = Self::block_from(&bytes[second_to_last_block_start..last_block_start]);
+
+        let mut x_n_buf = [0u8; BLOCK_SIZE];
+        x_n_buf[..rest].copy_from_slice(&bytes[last_block_start..]);
+        let x_n = Self::block_from(&x_n_buf);
+
+        let y_n_r = if encrypt {
+            apply(x_n_m_1 ^ prev)
+        } else {
+            apply(x_n_m_1) ^ x_n
+        };
+
+        let rest_bits = rest * 8;
+        let y_n = y_n_r & (u128::MAX >> (128 - rest_bits));
+        let r = y_n_r >> rest_bits;
+
+        let combined = if encrypt {
+            (x_n ^ y_n) | (r << rest_bits)
+        } else {
+            x_n | (r << rest_bits)
+        };
+
+        let y_n_m_1 = if encrypt {
+            apply(combined)
+        } else {
+            apply(combined) ^ prev
+        };
+
+        result.extend_from_slice(&y_n_m_1.to_le_bytes());
+        result.extend_from_slice(&y_n.to_le_bytes()[..rest]);
+
         return result;
+    }
+
+    pub fn encrypt_cbc(plain_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
+        let iv: u128 = random();
+        let mut res = Self::apply_cbc(plain_bytes, key, iv, true);
+        res.extend_from_slice(&iv.to_le_bytes());
+        return res;
+    }
+
+    pub fn decrypt_cbc(mut encrypted_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
+        let iv_start = encrypted_bytes.len() - BLOCK_SIZE;
+        let iv = Self::block_from(&encrypted_bytes[iv_start..]);
+        encrypted_bytes.truncate(iv_start);
+        return Self::apply_cbc(encrypted_bytes, key, iv, false);
     }
 
     pub fn encrypt_ctr(plain_bytes: Vec<u8>, key: &Key<8>) -> Vec<u8> {
