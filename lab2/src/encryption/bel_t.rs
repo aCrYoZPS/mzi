@@ -407,7 +407,30 @@ impl BelT {
     }
 
     pub fn compute_mac(message: Vec<u8>, key: &Key<8>, mac_bits: usize) -> Option<u64> {
-        todo!()
+        let full = message.len() / BLOCK_SIZE;
+        let rest = message.len() % BLOCK_SIZE;
+        let first_pass_blocks = if rest != 0 { full } else { full - 1 };
+
+        let apply = |n: u128| Self::encrypt_block(n, key);
+        let mut s = 0u128;
+        let r = apply(s);
+
+        for block in message.chunks(BLOCK_SIZE).take(first_pass_blocks) {
+            s = apply(s ^ Self::block_from(block));
+        }
+
+        let last_block_start = first_pass_blocks * BLOCK_SIZE;
+        let mut x_n_buf = [0u8; BLOCK_SIZE];
+        x_n_buf[..rest].copy_from_slice(&message[last_block_start..]);
+        let x_n = Self::block_from(&x_n_buf);
+
+        if rest == 0 {
+            s = s ^ x_n ^ Self::phi_1(r);
+        } else {
+            s = s ^ Self::psi(x_n, rest * 8) ^ Self::phi_2(r);
+        }
+
+        return Some((Self::l(64, apply(s)) as u64) & (u64::MAX >> mac_bits));
     }
 
     pub fn hash(message: Vec<u8>) -> Vec<u8> {
