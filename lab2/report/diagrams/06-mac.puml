@@ -1,0 +1,30 @@
+@startuml
+title Выработка имитовставки (belt-mac)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение X, ключ K,\nдлина имитовставки r бит;
+:s := 0;
+:rr := F(0);
+:head := число полных блоков,\nне считая последнего;
+:i := 1;
+while (i <= head ?) is (да)
+  :s := F(s xor X[i]);
+  :i := i + 1;
+endwhile (нет)
+:X[n] := оставшиеся байты сообщения;
+if (|X[n]| = 16 байт ?) then (да)
+  :s := F(s xor X[n] xor phi1(rr));
+else (нет)
+  :X[n] := X[n] || 0x80 || нули до 16 байт;
+  :s := F(s xor X[n] xor phi2(rr));
+endif
+:Выход: первые r бит\nпервых 8 байт s;
+stop
+
+@enduml

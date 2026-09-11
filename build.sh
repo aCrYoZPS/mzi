@@ -12,7 +12,17 @@ cd "$(dirname "$0")"
 labs=${*:-$(ls -d lab*/ 2>/dev/null | tr -d /)}
 
 for lab in $labs; do
-  [ -f "$lab/report/main.typ" ] || { echo "skip $lab (no report/main.typ)"; continue; }
-  echo "building $lab"
-  typst compile --root "$lab" "$lab/report/main.typ" "$lab/report/$lab.pdf"
+  if [ -f "$lab/report/main.typ" ]; then
+    echo "building $lab report"
+    typst compile --root "$lab" "$lab/report/main.typ" "$lab/report/$lab.pdf"
+  else
+    echo "skip $lab report (no report/main.typ)"
+  fi
+
+  # Спека к защите: свободное оформление, общий стиль в docs/style.typ,
+  # поэтому --root -- корень репозитория, а не каталог работы.
+  if [ -f "$lab/docs/$lab-spec.typ" ]; then
+    echo "building $lab spec"
+    typst compile --root . "$lab/docs/$lab-spec.typ" "$lab/docs/$lab-spec.pdf"
+  fi
 done

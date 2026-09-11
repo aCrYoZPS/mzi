@@ -1,0 +1,23 @@
+@startuml
+title Функция G_r
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: 32-битное слово u,\nвеличина сдвига r (5, 13 или 21);
+:j := 0;
+:res := 0;
+while (j < 4 ?) is (да)
+  :байт := (u >> 8j) & 0xFF;
+  :res := res | (H[байт] << 8j);
+  :j := j + 1;
+endwhile (нет)
+:res := циклический сдвиг res\nвлево на r бит;
+:Выход: res;
+stop
+
+@enduml

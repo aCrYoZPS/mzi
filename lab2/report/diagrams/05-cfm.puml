@@ -1,0 +1,30 @@
+@startuml
+title Режим гаммирования с обратной связью (belt-cfb)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение X, ключ K,\nсинхропосылка S, направление;
+:prev := S;
+:i := 1;
+while (есть полный блок X[i] ?) is (да)
+  :Y[i] := X[i] xor F(prev);
+  if (зашифрование ?) then (да)
+    :prev := Y[i];
+  else (нет)
+    :prev := X[i];
+  endif
+  :i := i + 1;
+endwhile (нет)
+if (последний блок неполный ?) then (да)
+  :Y[n] := X[n] xor первые |X[n]| байт F(prev);
+else (нет)
+endif
+:Выход: Y (длина равна |X|);
+stop
+
+@enduml

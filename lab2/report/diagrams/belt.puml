@@ -1,0 +1,48 @@
+@startuml
+title Блок-схема алгоритма BelT (СТБ 34.101.31-2011)\n(базовое преобразование блока)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: 128-битный блок, ключ K[1..8], режим работы;
+note right
+  G_r(u) := циклический сдвиг влево на r бит
+  от замены каждого байта u по таблице H
+  K[m] := слово ключа с номером ((m - 1) mod 8) + 1
+  Сложение и вычитание слов -- по модулю 2^32
+end note
+:a := байты 0..4 блока,   b := байты 4..8,\nc := байты 8..12,   d := байты 12..16;
+:n := 1;
+
+while (n <= 8 ?) is (да)
+  if (зашифрование ?) then (да)
+    :i := n;\n(j1, ..., j7) := (7i-6, 7i-5, 7i-4, 7i-3, 7i-2, 7i-1, 7i);
+  else (нет)
+    :i := 9 - n;\n(j1, ..., j7) := (7i, 7i-1, 7i-2, 7i-3, 7i-4, 7i-5, 7i-6);
+  endif
+
+  :b := b xor G_5(a + K[j1]);\nc := c xor G_21(d + K[j2]);\na := a - G_13(b + K[j3]);
+  :e := G_21(b + c + K[j4]) xor i;\nb := b + e;\nc := c - e;
+  :d := d + G_13(c + K[j5]);\nb := b xor G_21(a + K[j6]);\nc := c xor G_5(d + K[j7]);
+
+  if (зашифрование ?) then (да)
+    :(a, b) := (b, a);   (c, d) := (d, c);   (b, c) := (c, b);
+  else (нет)
+    :(a, b) := (b, a);   (c, d) := (d, c);   (a, d) := (d, a);
+  endif
+
+  :n := n + 1;
+endwhile (нет)
+
+if (зашифрование ?) then (да)
+  :Выход: блок b || d || a || c;
+else (нет)
+  :Выход: блок c || a || d || b;
+endif
+stop
+
+@enduml

@@ -1,0 +1,31 @@
+@startuml
+title Режим сцепления блоков (belt-cbc)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение X, ключ K,\nсинхропосылка S, направление;
+:prev := S;
+:i := 1;
+while (есть полный блок X[i] ?) is (да)
+  if (зашифрование ?) then (да)
+    :Y[i] := F(X[i] xor prev);
+    :prev := Y[i];
+  else (нет)
+    :Y[i] := F^-1(X[i]) xor prev;
+    :prev := X[i];
+  endif
+  :i := i + 1;
+endwhile (нет)
+if (последний блок неполный ?) then (да)
+  :обработать два последних блока\nкражей шифртекста;
+else (нет)
+endif
+:Выход: Y;
+stop
+
+@enduml

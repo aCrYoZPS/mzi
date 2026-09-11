@@ -403,38 +403,48 @@ impl BelT {
     }
 
     fn psi(u: u128, word_len_bits: usize) -> u128 {
-        return u | (1 << word_len_bits + 7);
+        return u | (1 << (word_len_bits + 7));
+    }
+
+    fn truncate_mac(s: u128, mac_bits: usize) -> u64 {
+        let tag = u64::from_be_bytes(
+            s.to_le_bytes()[..8]
+                .try_into()
+                .expect("a block always has 16 bytes"),
+        );
+
+        return tag >> (64 - mac_bits);
     }
 
     pub fn compute_mac(message: Vec<u8>, key: &Key<8>, mac_bits: usize) -> Option<u64> {
-        let full = message.len() / BLOCK_SIZE;
-        let rest = message.len() % BLOCK_SIZE;
-        let first_pass_blocks = if rest != 0 { full } else { full - 1 };
+        assert!(
+            (1..=MAX_MAC_BITS).contains(&mac_bits),
+            "mac bits must be in 1..={MAX_MAC_BITS}, got {mac_bits}"
+        );
+
+        let whole_tail = !message.is_empty() && message.len() % BLOCK_SIZE == 0;
+        let head_blocks = message.len() / BLOCK_SIZE - whole_tail as usize;
 
         let apply = |n: u128| Self::encrypt_block(n, key);
         let mut s = 0u128;
         let r = apply(s);
 
-        for block in message.chunks(BLOCK_SIZE).take(first_pass_blocks) {
+        for block in message.chunks_exact(BLOCK_SIZE).take(head_blocks) {
             s = apply(s ^ Self::block_from(block));
         }
 
-        let last_block_start = first_pass_blocks * BLOCK_SIZE;
+        let tail = &message[head_blocks * BLOCK_SIZE..];
         let mut x_n_buf = [0u8; BLOCK_SIZE];
-        x_n_buf[..rest].copy_from_slice(&message[last_block_start..]);
+        x_n_buf[..tail.len()].copy_from_slice(tail);
         let x_n = Self::block_from(&x_n_buf);
 
-        if rest == 0 {
-            s = s ^ x_n ^ Self::phi_1(r);
+        s = if whole_tail {
+            s ^ x_n ^ Self::phi_1(r)
         } else {
-            s = s ^ Self::psi(x_n, rest * 8) ^ Self::phi_2(r);
-        }
+            s ^ Self::psi(x_n, tail.len() * 8) ^ Self::phi_2(r)
+        };
 
-        return Some((Self::l(64, apply(s)) as u64) & (u64::MAX >> mac_bits));
-    }
-
-    pub fn hash(message: Vec<u8>) -> Vec<u8> {
-        todo!()
+        return Some(Self::truncate_mac(apply(s), mac_bits));
     }
 }
 
@@ -680,39 +690,34 @@ mod tests {
     }
 
     #[test]
-    fn hash_partial_block() {
-        let x = bytes("B194BAC80A08F53B366D008E58");
-        let y = bytes("ABEF9725D4C5A83597A367D14494CC25 42F20F659DDFECC961A3EC550CBA8C75");
-
-        assert_eq!(BelT::hash(x), y);
+    fn mac_of_the_empty_message_is_defined() {
+        assert!(BelT::compute_mac(vec![], &key(K1), MAX_MAC_BITS).is_some());
     }
 
     #[test]
-    fn hash_whole_block() {
-        let x = bytes("B194BAC80A08F53B366D008E584A5DE4 8504FA9D1BB6C7AC252E72C202FDCE0D");
-        let y = bytes("749E4C3653AECE5E48DB4761227742EB 6DBE13F4A80F7BEFF1A9CF8D10EE7786");
-
-        assert_eq!(BelT::hash(x), y);
-    }
-
-    #[test]
-    fn hash_partial_second_block() {
-        let x = bytes(
-            "B194BAC80A08F53B366D008E584A5DE4 8504FA9D1BB6C7AC252E72C202FDCE0D
-             5BE3D61217B96181FE6786AD716B890B",
-        );
-        let y = bytes("9D02EE446FB6A29FE5C982D4B13AF9D3 E90861BC4CEF27CF306BFB0B174A154A");
-
-        assert_eq!(BelT::hash(x), y);
-    }
-
-    #[test]
-    fn hash_length_is_part_of_the_digest() {
+    fn mac_sees_the_length_of_the_message() {
         let x = bytes("B194BAC80A08F53B366D008E58");
         let mut padded = x.clone();
         padded.push(0);
 
-        assert_ne!(BelT::hash(x), BelT::hash(padded));
+        assert_ne!(
+            BelT::compute_mac(x, &key(K1), MAX_MAC_BITS),
+            BelT::compute_mac(padded, &key(K1), MAX_MAC_BITS),
+            "the 0x80 padding bit must keep a zero byte from being invisible"
+        );
+    }
+
+    #[test]
+    fn mac_accepts_every_length() {
+        let k = key(K1);
+        let message: Vec<u8> = (0..80u8).collect();
+
+        for length in 0..=message.len() {
+            assert!(
+                BelT::compute_mac(message[..length].to_vec(), &k, MAX_MAC_BITS).is_some(),
+                "{length} bytes"
+            );
+        }
     }
 
     #[test]

@@ -1,5 +1,5 @@
 mod encryption;
-use common::cli::{self, CipherApp, CipherFn, CipherMode, DigestSpec, MacSpec};
+use common::cli::{self, CipherApp, CipherFn, CipherMode, MacSpec};
 use common::key::Key;
 use encryption::bel_t::*;
 
@@ -25,15 +25,12 @@ fn modes() -> Vec<CipherMode> {
             let mode = CipherMode::new(encryption_type.to_string(), encrypt, decrypt);
 
             return match encryption_type {
-                // ciphertext stealing has nothing to steal from below one block
                 BelTType::ECB => mode
                     .checking_plaintext(cli::at_least(BLOCK_SIZE))
                     .checking_ciphertext(cli::at_least(BLOCK_SIZE)),
-                // ... and CBC carries the sync value in front of it
                 BelTType::CBC => mode
                     .checking_plaintext(cli::at_least(BLOCK_SIZE))
                     .checking_ciphertext(cli::at_least(2 * BLOCK_SIZE)),
-                // the gamma modes keep the length, only the sync value is added
                 _ => mode.checking_ciphertext(cli::at_least(BLOCK_SIZE)),
             };
         })
@@ -50,10 +47,7 @@ fn main() {
             default_bits: DEFAULT_MAC_BITS,
             max_bits: MAX_MAC_BITS,
         }),
-        digest: Some(DigestSpec {
-            name: "hash",
-            compute: BelT::hash,
-        }),
+        digest: None,
         default_key: KEY,
     }
     .run();

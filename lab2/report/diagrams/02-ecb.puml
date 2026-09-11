@@ -1,0 +1,32 @@
+@startuml
+title Режим простой замены (belt-ecb)\nс кражей шифртекста
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение X (не короче 16 байт),\nключ K, направление;
+:F := зашифрование блока при зашифровании,\nF := расшифрование блока при расшифровании;
+:full := |X| div 16;
+:rest := |X| mod 16;
+:i := 1;
+while (i <= full ?) is (да)
+  :Y[i] := F(X[i]);
+  :i := i + 1;
+endwhile (нет)
+
+if (rest = 0 ?) then (да)
+else (нет)
+  :n := full + 1;
+  :Y* := Y[n-1];
+  :Y[n] := первые rest байт Y*;
+  :Y[n-1] := F(X[n] || последние 16-rest байт Y*);
+endif
+
+:Выход: Y (длина равна |X|);
+stop
+
+@enduml

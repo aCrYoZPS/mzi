@@ -30,19 +30,28 @@ The template needs the fonts Times New Roman, Courier New and GOST type B
 ./build.sh lab1     # one lab
 ```
 
-Produces `labN/report/labN.pdf`.
+Produces `labN/report/labN.pdf` (the STP report) and `labN/docs/labN-spec.pdf`
+(the free-form spec used to prepare for the defence -- formulas, mode
+properties and likely questions, in Russian).
 
 ## Layout
 
 ```
+docs/
+  style.typ            shared styling for the specs
 labN/
   src/                 Rust sources
+  docs/
+    labN-spec.typ      #import "/docs/style.typ", built with --root .
+    labN-spec.pdf
   report/
     main.typ           #import "@local/stp2024:0.1.0"
     title.typ
     img/               screenshots
     labN.pdf
 ```
+
+The specs need no template install -- only the fonts typst ships with.
 
 Listings pull the real sources via `read("../src/…")`, so they never drift
 from the code -- this is why `build.sh` passes `--root labN`.

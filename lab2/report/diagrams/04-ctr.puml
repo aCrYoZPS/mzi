@@ -1,0 +1,27 @@
+@startuml
+title Режим счётчика (belt-ctr)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение X, ключ K,\nсинхропосылка S;
+:s := F(S);
+:i := 1;
+while (есть полный блок X[i] ?) is (да)
+  :s := s + 1;
+  :Y[i] := X[i] xor F(s);
+  :i := i + 1;
+endwhile (нет)
+if (последний блок неполный ?) then (да)
+  :s := s + 1;
+  :Y[n] := X[n] xor первые |X[n]| байт F(s);
+else (нет)
+endif
+:Выход: Y (длина равна |X|);
+stop
+
+@enduml
