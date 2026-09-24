@@ -4,8 +4,6 @@ use std::ops::Range;
 
 const WORD: usize = 64;
 
-/// A vector over GF(2). Bit i lives in words[i / 64] at position i % 64, and the unused bits
-/// of the last word are always zero, so equality and weight can work word by word.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BitVec {
     len: usize,
@@ -30,7 +28,6 @@ impl BitVec {
         return v;
     }
 
-    /// A random vector with exactly `weight` ones.
     pub fn random_with_weight<R: Rng>(len: usize, weight: usize, rng: &mut R) -> Self {
         assert!(weight <= len, "weight {weight} exceeds length {len}");
         let mut v = Self::zeros(len);
@@ -41,7 +38,6 @@ impl BitVec {
         return v;
     }
 
-    /// Parses a string of '0' and '1', ignoring whitespace.
     pub fn from_bit_string(bits: &str) -> Result<Self, String> {
         let bits: Vec<char> = bits.chars().filter(|c| !c.is_whitespace()).collect();
         let mut v = Self::zeros(bits.len());
@@ -98,7 +94,6 @@ impl BitVec {
         self.words[i / WORD] ^= 1 << (i % WORD);
     }
 
-    /// self += other over GF(2).
     pub fn xor_assign(&mut self, other: &BitVec) {
         assert_eq!(self.len, other.len, "length mismatch");
         for (a, b) in self.words.iter_mut().zip(&other.words) {
@@ -113,7 +108,6 @@ impl BitVec {
         return result;
     }
 
-    /// Hamming weight: the number of ones.
     pub fn weight(&self) -> usize {
         return self.words.iter().map(|w| w.count_ones() as usize).sum();
     }
@@ -122,7 +116,6 @@ impl BitVec {
         return self.words.iter().all(|&w| w == 0);
     }
 
-    /// Positions of the ones, in increasing order.
     pub fn iter_ones(&self) -> impl Iterator<Item = usize> + '_ {
         return self.words.iter().enumerate().flat_map(|(i, &word)| {
             let mut rest = word;
@@ -137,7 +130,6 @@ impl BitVec {
         });
     }
 
-    /// The first `len` bits.
     pub fn prefix(&self, len: usize) -> BitVec {
         assert!(len <= self.len, "prefix longer than the vector");
         let mut v = Self {
@@ -159,7 +151,6 @@ impl BitVec {
         return v;
     }
 
-    /// Position of the last one, if any.
     pub fn last_one(&self) -> Option<usize> {
         let (i, word) = self
             .words
@@ -171,8 +162,6 @@ impl BitVec {
         return Some(i * WORD + (WORD - 1 - word.leading_zeros() as usize));
     }
 
-    /// `len` bits from ⌈len/8⌉ bytes, least significant bit first: bit 8j + b is bit b of
-    /// bytes[j]. The bits of the last byte past `len` must be zero.
     pub fn from_bytes(bytes: &[u8], len: usize) -> Result<Self, String> {
         if bytes.len() != len.div_ceil(8) {
             return Err(format!(
@@ -195,7 +184,6 @@ impl BitVec {
         return Ok(v);
     }
 
-    /// The inverse of `from_bytes`; the unused bits of the last byte are zero.
     pub fn to_bytes(&self) -> Vec<u8> {
         return (0..self.len.div_ceil(8))
             .map(|j| (self.words[j / 8] >> (8 * (j % 8))) as u8)
@@ -203,7 +191,6 @@ impl BitVec {
     }
 }
 
-/// A permutation of n positions: position i moves to map[i].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Permutation {
     map: Vec<usize>,
@@ -216,7 +203,6 @@ impl Permutation {
         };
     }
 
-    /// Fisher–Yates shuffle.
     pub fn random<R: Rng>(n: usize, rng: &mut R) -> Self {
         let mut map: Vec<usize> = (0..n).collect();
         map.shuffle(rng);
@@ -261,7 +247,6 @@ impl Permutation {
         return Self { map };
     }
 
-    /// v·P: bit i of v ends up at position map[i].
     pub fn apply(&self, v: &BitVec) -> BitVec {
         assert_eq!(v.len(), self.len(), "length mismatch");
         let mut result = BitVec::zeros(v.len());
@@ -272,7 +257,6 @@ impl Permutation {
         return result;
     }
 
-    /// The same rearrangement as `apply`, for any sequence.
     pub fn permute<T: Clone>(&self, items: &[T]) -> Vec<T> {
         assert_eq!(items.len(), self.len(), "length mismatch");
         let mut result = items.to_vec();
@@ -284,18 +268,14 @@ impl Permutation {
     }
 }
 
-/// A matrix over GF(2), stored as a list of rows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Matrix {
     cols: usize,
     rows: Vec<BitVec>,
 }
 
-/// The result of `Matrix::systematic`.
 pub struct Systematic {
-    /// rank × n, of the form [A | I_rank].
     pub matrix: Matrix,
-    /// Where each column of the original matrix went.
     pub permutation: Permutation,
 }
 
@@ -353,7 +333,6 @@ impl Matrix {
         self.rows[row].set(col, value);
     }
 
-    /// v·M: the sum of the rows picked out by the ones of v.
     pub fn vec_mul(&self, v: &BitVec) -> BitVec {
         assert_eq!(v.len(), self.row_count(), "length mismatch");
         let mut result = BitVec::zeros(self.cols);
@@ -364,7 +343,6 @@ impl Matrix {
         return result;
     }
 
-    /// self · other.
     pub fn mul(&self, other: &Matrix) -> Matrix {
         return Self {
             cols: other.cols,
@@ -383,7 +361,6 @@ impl Matrix {
         return result;
     }
 
-    /// M·P: column i moves to column p.map(i).
     pub fn permute_columns(&self, p: &Permutation) -> Matrix {
         return Self {
             cols: self.cols,
@@ -403,7 +380,6 @@ impl Matrix {
         return result;
     }
 
-    /// [self | other].
     pub fn hstack(&self, other: &Matrix) -> Matrix {
         assert_eq!(self.row_count(), other.row_count(), "row count mismatch");
         let mut result = Self::zeros(self.row_count(), self.cols + other.cols);
@@ -419,7 +395,6 @@ impl Matrix {
         return result;
     }
 
-    /// Gauss–Jordan elimination on [M | I]; None when M is singular.
     pub fn inverse(&self) -> Option<Matrix> {
         let n = self.row_count();
         assert_eq!(n, self.cols, "only square matrices have inverses");
@@ -446,8 +421,6 @@ impl Matrix {
         });
     }
 
-    /// A random invertible n × n matrix together with its inverse. About 29% of random
-    /// matrices over GF(2) are invertible, so this takes 3–4 attempts on average.
     pub fn random_invertible<R: Rng>(n: usize, rng: &mut R) -> (Matrix, Matrix) {
         loop {
             let candidate = Self::random(n, n, rng);
@@ -457,15 +430,11 @@ impl Matrix {
         }
     }
 
-    /// Row-reduces to [A | I_r] up to a column permutation, where r is the rank; zero rows
-    /// are dropped. Pivots are sought in the rightmost columns first, left to right, so a
-    /// matrix whose right r × r block is already invertible keeps its column order.
     pub fn systematic(&self) -> Systematic {
         let n = self.cols;
         let mut rows = self.rows.clone();
         let right = n.saturating_sub(rows.len());
 
-        // pivots[j] is the column holding the leading one of row j.
         let mut pivots: Vec<usize> = vec![];
         for col in (right..n).chain((0..right).rev()) {
             let rank = pivots.len();
@@ -486,11 +455,9 @@ impl Matrix {
             pivots.push(col);
         }
 
-        // Every row past the rank has been cleared by now.
         let rank = pivots.len();
         rows.truncate(rank);
 
-        // Free columns go first in their original order, then row j's pivot column to k + j.
         let k = n - rank;
         let mut map = vec![usize::MAX; n];
         for (j, &col) in pivots.iter().enumerate() {
@@ -529,8 +496,6 @@ mod tests {
         return Matrix::from_rows(rows[0].len(), rows);
     }
 
-    /// Checks everything the Goppa code relies on: the reduced matrix is [A | I], and
-    /// G = [I | Aᵀ], moved back to the original column order, is orthogonal to the input.
     fn check_systematic(h: &Matrix) -> Systematic {
         let sys = h.systematic();
         let n = h.col_count();
@@ -721,7 +686,6 @@ mod tests {
 
     #[test]
     fn systematic_with_singular_right_block() {
-        // The last column is zero, so a pivot has to come from the left part.
         let h = matrix(&["1101100", "1011010", "0111000"]);
         let sys = check_systematic(&h);
         assert_eq!(sys.matrix.row_count(), 3);

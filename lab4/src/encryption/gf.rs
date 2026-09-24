@@ -1,37 +1,19 @@
 use rand::Rng;
 
-/// An element of GF(2^m): bit i is the coefficient of z^i in a polynomial of degree < m.
 pub type Gf = u16;
 
 pub const MIN_M: u32 = 2;
 pub const MAX_M: u32 = 16;
 
-/// Primitive polynomials for m = 2..=16; bit i is the coefficient of z^i.
 const PRIMITIVE_POLYNOMIALS: [u32; 15] = [
-    0x7,     // z^2 + z + 1
-    0xB,     // z^3 + z + 1
-    0x13,    // z^4 + z + 1
-    0x25,    // z^5 + z^2 + 1
-    0x43,    // z^6 + z + 1
-    0x83,    // z^7 + z + 1
-    0x11D,   // z^8 + z^4 + z^3 + z^2 + 1
-    0x211,   // z^9 + z^4 + 1
-    0x409,   // z^10 + z^3 + 1
-    0x805,   // z^11 + z^2 + 1
-    0x1053,  // z^12 + z^6 + z^4 + z + 1
-    0x201B,  // z^13 + z^4 + z^3 + z + 1
-    0x4443,  // z^14 + z^10 + z^6 + z + 1
-    0x8003,  // z^15 + z + 1
-    0x1100B, // z^16 + z^12 + z^3 + z + 1
+    0x7, 0xB, 0x13, 0x25, 0x43, 0x83, 0x11D, 0x211, 0x409, 0x805, 0x1053, 0x201B, 0x4443, 0x8003,
+    0x1100B,
 ];
 
-/// GF(2^m) built from a primitive polynomial, with multiplication through log/exp tables.
 pub struct Field {
     m: u32,
     modulus: u32,
-    /// exp[i] = α^i, stored twice over so that a sum of two logarithms needs no reduction.
     exp: Vec<Gf>,
-    /// log[a] = i such that α^i = a; log[0] is meaningless.
     log: Vec<u32>,
 }
 
@@ -59,7 +41,6 @@ impl Field {
         let mut log = vec![0; order + 1];
         let mut seen = vec![false; order + 1];
 
-        // α is primitive exactly when its powers run through every non-zero element.
         let mut a: u32 = 1;
         for i in 0..order {
             if a == 0 || seen[a as usize] {
@@ -95,12 +76,10 @@ impl Field {
         return self.modulus;
     }
 
-    /// Number of elements, 2^m.
     pub fn size(&self) -> usize {
         return 1 << self.m;
     }
 
-    /// Order of the multiplicative group, 2^m - 1.
     pub fn order(&self) -> usize {
         return self.size() - 1;
     }
@@ -131,13 +110,11 @@ impl Field {
         return self.mul(a, a);
     }
 
-    /// The square root, which always exists and is unique in characteristic 2.
     pub fn sqrt(&self, a: Gf) -> Gf {
         if a == 0 {
             return 0;
         }
 
-        // √a = a^(2^(m-1)), because squaring it gives a^(2^m) = a.
         let exponent = self.log[a as usize] as u64 * (1 << (self.m - 1)) % self.order() as u64;
 
         return self.exp[exponent as usize];
@@ -154,7 +131,6 @@ impl Field {
         return self.exp[exponent as usize];
     }
 
-    /// α^i for the primitive element α = z.
     pub fn alpha_pow(&self, i: usize) -> Gf {
         return self.exp[i % self.order()];
     }
@@ -175,7 +151,6 @@ impl Field {
         return rng.gen_range(1..self.size()) as Gf;
     }
 
-    /// The element as a power of α: "0", "1", "α" or "α^i".
     pub fn display(&self, a: Gf) -> String {
         return match self.log(a) {
             None => "0".to_string(),
@@ -190,7 +165,6 @@ impl Field {
 mod tests {
     use super::*;
 
-    /// Shift-and-add multiplication, independent of the tables.
     fn mul_reference(a: Gf, b: Gf, m: u32, modulus: u32) -> Gf {
         let mut a = a as u32;
         let mut b = b as u32;
@@ -220,13 +194,9 @@ mod tests {
 
     #[test]
     fn rejects_bad_moduli() {
-        // z^4 + z^3 + z^2 + z + 1: irreducible, but α has order 5.
         assert!(Field::with_modulus(4, 0b11111).is_err());
-        // z^4 + z^2 + 1 = (z^2 + z + 1)^2.
         assert!(Field::with_modulus(4, 0b10101).is_err());
-        // z^4 + z^3 = z^3 (z + 1).
         assert!(Field::with_modulus(4, 0b11000).is_err());
-        // Wrong degree.
         assert!(Field::with_modulus(4, 0b1011).is_err());
         assert!(Field::with_modulus(4, 0b10011).is_ok());
     }
@@ -300,7 +270,6 @@ mod tests {
         assert_eq!(field.display(0), "0");
         assert_eq!(field.display(1), "1");
         assert_eq!(field.display(0b10), "α");
-        // α^7 = z^3 + z + 1 for z^4 + z + 1.
         assert_eq!(field.display(0b1011), "α^7");
     }
 }

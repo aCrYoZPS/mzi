@@ -6,8 +6,6 @@ use num_prime::nt_funcs::is_prime;
 
 const TITLE: &str = "Rabin cryptosystem";
 const ENCRYPTED_EXTENSION: &str = "rabin";
-/// A block holds at least as many data bytes as the redundancy copies from it,
-/// plus the redundancy itself and the marker, and the modulus is one byte wider.
 const MIN_MODULUS_BYTES: usize = 2 * REDUNDANCY_SIZE + 2;
 
 fn generate_keys() -> (PrivateKey, PublicKey) {

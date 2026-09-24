@@ -1,4 +1,3 @@
-// Some helpers of the algebra modules are only exercised by their tests.
 #[allow(dead_code)]
 mod encryption;
 use common::cli::{self, IoMode};
@@ -16,7 +15,6 @@ const PRESETS: [(&str, Params); 3] = [
     ("small", Params::SMALL),
     ("original (1978)", Params::ORIGINAL),
 ];
-/// Matrices and lists with at most this many columns or entries are printed in full.
 const PRINT_LIMIT: usize = 64;
 
 fn generate_keys(params: Params) -> Result<(PrivateKey, PublicKey), String> {
@@ -75,7 +73,6 @@ fn read_params(current: Params) -> Result<Params, String> {
     return Ok(Params { m: m as u32, n, t });
 }
 
-/// z^4 + z + 1 for 0b10011.
 fn field_polynomial(modulus: u32) -> String {
     let terms: Vec<String> = (0..u32::BITS)
         .rev()
@@ -90,7 +87,6 @@ fn field_polynomial(modulus: u32) -> String {
     return terms.join(" + ");
 }
 
-/// Bits in groups of eight, for readability.
 fn grouped(v: &BitVec) -> String {
     let bits = v.to_bit_string();
     let groups: Vec<&str> = bits
@@ -199,7 +195,6 @@ fn run_cipher(
     );
 }
 
-/// Encrypts and decrypts one block, printing every intermediate value.
 fn trace_block(private: &PrivateKey, public: &PublicKey) -> Result<(), String> {
     let (n, k) = (public.n(), public.k());
     let mut rng = StdRng::from_rng(&mut OsRng).unwrap();

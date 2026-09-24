@@ -1,0 +1,44 @@
+@startuml
+title Блок-схема алгоритма SHA-1
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение M длиной L бит;
+note right
+  Слово -- 32 бита
+  Сложение слов -- по модулю 2^32
+  Байты слова записываются от старшего к младшему
+  ROTLn -- циклический сдвиг влево на n бит
+end note
+
+:M := M || 1 || 0 ... 0 || L\n(L -- 64 бита; дополнение до длины, кратной 512 бит);
+:H0 := 67452301,  H1 := EFCDAB89,  H2 := 98BADCFE,\nH3 := 10325476,  H4 := C3D2E1F0;
+:i := 1;
+while (i <= |M| / 512 ?) is (да)
+  :W0 ... W15 := i-й блок M из 16 слов;
+  :Wt := ROTL1(Wt-3 xor Wt-8 xor Wt-14 xor Wt-16),\nt = 16 ... 79;
+  :a, b, c, d, e := H0, H1, H2, H3, H4;
+  :t := 0;
+  while (t <= 79 ?) is (да)
+    :ft, Kt := функция и константа раунда t;
+    note right
+      t = 0 ... 19:   f = (b and c) or (not b and d),  K = 5A827999
+      t = 20 ... 39:  f = b xor c xor d,  K = 6ED9EBA1
+      t = 40 ... 59:  f = (b and c) or (b and d) or (c and d),  K = 8F1BBCDC
+      t = 60 ... 79:  f = b xor c xor d,  K = CA62C1D6
+    end note
+    :T := ROTL5(a) + ft(b, c, d) + e + Kt + Wt;
+    :e := d,  d := c,  c := ROTL30(b),  b := a,  a := T;
+    :t := t + 1;
+  endwhile (нет)
+  :H0 := H0 + a,  H1 := H1 + b,  H2 := H2 + c,\nH3 := H3 + d,  H4 := H4 + e;
+  :i := i + 1;
+endwhile (нет)
+:Выход: H0 || H1 || H2 || H3 || H4 (160 бит);
+stop
+@enduml

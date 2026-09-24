@@ -3,7 +3,6 @@ use super::matrix::{BitVec, Matrix, Permutation};
 use rand::rngs::OsRng;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-/// Code parameters: a binary Goppa code over GF(2^m) of length n correcting t errors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Params {
     pub m: u32,
@@ -12,10 +11,8 @@ pub struct Params {
 }
 
 impl Params {
-    /// Small enough to follow by hand: k = 8.
     pub const TOY: Params = Params { m: 4, n: 16, t: 2 };
     pub const SMALL: Params = Params { m: 8, n: 256, t: 8 };
-    /// The parameters of McEliece's 1978 paper: k = 524.
     pub const ORIGINAL: Params = Params {
         m: 10,
         n: 1024,
@@ -25,7 +22,6 @@ impl Params {
 
 #[derive(Clone)]
 pub struct PublicKey {
-    /// G' = S·G·P, k × n.
     matrix: Matrix,
     t: usize,
 }
@@ -47,7 +43,6 @@ impl PublicKey {
         return self.t;
     }
 
-    /// Bytes of one ciphertext block.
     fn block_bytes(&self) -> usize {
         return self.n().div_ceil(8);
     }
@@ -109,15 +104,12 @@ impl McEliece {
         return Ok((private, public));
     }
 
-    /// c = m·G' + e, with e a random vector of weight exactly t.
     pub fn encrypt_block<R: Rng>(message: &BitVec, key: &PublicKey, rng: &mut R) -> BitVec {
         let e = BitVec::random_with_weight(key.n(), key.t(), rng);
 
         return key.matrix.vec_mul(message).xor(&e);
     }
 
-    /// c·P⁻¹ = (m·S)·G + e·P⁻¹ still carries t errors, which the Goppa decoder removes;
-    /// the codeword starts with m·S, and S⁻¹ recovers m.
     pub fn decrypt_block(cipher: &BitVec, key: &PrivateKey) -> Result<BitVec, String> {
         let codeword = key.code.decode(&key.p_inv.apply(cipher))?;
         let message_s = key.code.message(&codeword);
@@ -131,8 +123,6 @@ impl McEliece {
         return Self::encrypt_with_rng(plain_bytes, key, &mut rng);
     }
 
-    /// Splits the plaintext bits into k-bit blocks after padding them with a one and then
-    /// zeros; every block becomes ⌈n/8⌉ bytes of ciphertext.
     pub fn encrypt_with_rng<R: Rng>(plain_bytes: Vec<u8>, key: &PublicKey, rng: &mut R) -> Vec<u8> {
         let k = key.k();
         let data_len = plain_bytes.len() * 8;
@@ -172,7 +162,6 @@ impl McEliece {
             }
         }
 
-        // The padding is a one followed by zeros, 1..=k bits long, and starts on a byte.
         match padded.last_one() {
             Some(pos) if pos.is_multiple_of(8) && pos + k >= padded.len() => {
                 return Ok(padded.prefix(pos).to_bytes());
@@ -200,7 +189,6 @@ mod tests {
             (code.n(), code.k(), code.t())
         );
 
-        // G' = S·G·P, with S and P taken back from their inverses.
         let s = private.s_inv().inverse().unwrap();
         let p = private.p_inv().inverse();
         assert_eq!(
@@ -208,7 +196,6 @@ mod tests {
             &s.mul(code.generator()).permute_columns(&p)
         );
 
-        // G' is not simply G: S and P hide the systematic form.
         assert_ne!(
             public.matrix().columns(0..public.k()),
             Matrix::identity(public.k())
@@ -235,7 +222,6 @@ mod tests {
         let (_, public) = McEliece::keygen_with_rng(Params::SMALL, &mut rng).unwrap();
         let zero = BitVec::zeros(public.k());
         for _ in 0..20 {
-            // For m = 0 the ciphertext is e itself.
             assert_eq!(
                 McEliece::encrypt_block(&zero, &public, &mut rng).weight(),
                 public.t()
@@ -289,7 +275,6 @@ mod tests {
         assert!(McEliece::decrypt(vec![], &private).is_err());
         assert!(McEliece::decrypt(cipher[1..].to_vec(), &private).is_err());
 
-        // A decryptable block that carries no padding bit.
         let zero_block = McEliece::encrypt_block(&BitVec::zeros(public.k()), &public, &mut rng);
         assert!(McEliece::decrypt(zero_block.to_bytes(), &private).is_err());
 
@@ -302,7 +287,6 @@ mod tests {
 
     #[test]
     fn rejects_bits_past_n() {
-        // n = 30 leaves two unused bits in the last byte of every block.
         let mut rng = rng();
         let params = Params { m: 5, n: 30, t: 3 };
         let (private, public) = McEliece::keygen_with_rng(params, &mut rng).unwrap();
@@ -314,8 +298,6 @@ mod tests {
 
     #[test]
     fn one_flipped_bit_is_fatal_or_absorbed() {
-        // Flipping a ciphertext bit either cancels one of the t errors, which still decodes,
-        // or adds a (t+1)-th, which the decoder cannot correct.
         let mut rng = rng();
         let (private, public) = McEliece::keygen_with_rng(Params::TOY, &mut rng).unwrap();
         let message = BitVec::random(public.k(), &mut rng);

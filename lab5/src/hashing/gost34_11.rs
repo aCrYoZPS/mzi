@@ -128,7 +128,7 @@ pub const C: [[u8; 64]; 12] = [
     [
         0xae, 0x4f, 0xae, 0xae, 0x1d, 0x3a, 0xd3, 0xd9, 0x6f, 0xa4, 0xc3, 0x3b, 0x7a, 0x30, 0x39,
         0xc0, 0x2d, 0x66, 0xc4, 0xf9, 0x51, 0x42, 0xa4, 0x6c, 0x18, 0x7f, 0x9a, 0xb4, 0x9a, 0xf0,
-        0x8e, 0xc6, 0xcf, 0xfa, 0xa6, 0xb7, 0x1c, 0x9a, 0xb7, 0xb4, 0x0a, 0xf2, 0x1f, 0x66, 0x2c,
+        0x8e, 0xc6, 0xcf, 0xfa, 0xa6, 0xb7, 0x1c, 0x9a, 0xb7, 0xb4, 0x0a, 0xf2, 0x1f, 0x66, 0xc2,
         0xbe, 0xc6, 0xb6, 0xbf, 0x71, 0xc5, 0x72, 0x36, 0x90, 0x4f, 0x35, 0xfa, 0x68, 0x40, 0x7a,
         0x46, 0x64, 0x7d, 0x6e,
     ],
@@ -155,14 +155,14 @@ pub const C: [[u8; 64]; 12] = [
     ],
     [
         0xab, 0xbe, 0xde, 0xa6, 0x80, 0x05, 0x6f, 0x52, 0x38, 0x2a, 0xe5, 0x48, 0xb2, 0xe4, 0xf3,
-        0xf3, 0x89, 0x41, 0xe7, 0x1c, 0xff, 0x8a, 0x78, 0xdb, 0x1f, 0xfe, 0x18, 0xa1, 0xb3, 0x36,
+        0xf3, 0x89, 0x41, 0xe7, 0x1c, 0xff, 0x8a, 0x78, 0xdb, 0x1f, 0xff, 0xe1, 0x8a, 0x1b, 0x33,
         0x61, 0x03, 0x9f, 0xe7, 0x67, 0x02, 0xaf, 0x69, 0x33, 0x4b, 0x7a, 0x1e, 0x6c, 0x30, 0x3b,
         0x76, 0x52, 0xf4, 0x36, 0x98, 0xfa, 0xd1, 0x15, 0x3b, 0xb6, 0xc3, 0x74, 0xb4, 0xc7, 0xfb,
         0x98, 0x45, 0x9c, 0xed,
     ],
     [
         0x7b, 0xcd, 0x9e, 0xd0, 0xef, 0xc8, 0x89, 0xfb, 0x30, 0x02, 0xc6, 0xcd, 0x63, 0x5a, 0xfe,
-        0x94, 0xd8, 0xfa, 0x6b, 0xbe, 0xba, 0xb0, 0x76, 0x12, 0x20, 0x01, 0x80, 0x21, 0x14, 0x84,
+        0x94, 0xd8, 0xfa, 0x6b, 0xbb, 0xeb, 0xab, 0x07, 0x61, 0x20, 0x01, 0x80, 0x21, 0x14, 0x84,
         0x66, 0x79, 0x8a, 0x1d, 0x71, 0xef, 0xea, 0x48, 0xb9, 0xca, 0xef, 0xba, 0xcd, 0x1d, 0x7d,
         0x47, 0x6e, 0x98, 0xde, 0xa2, 0x59, 0x4a, 0xc0, 0x6f, 0xd8, 0x5d, 0x6b, 0xca, 0xa4, 0xcd,
         0x81, 0xf3, 0x2d, 0x1b,
@@ -200,15 +200,24 @@ impl Gost34_11 {
 
     fn l(a: &[u8]) -> Vec<u8> {
         debug_assert!(a.len() == BLOCK_SIZE);
-        let mut res = 0u64;
-        let n = u64::from_le_bytes(a.try_into().expect("len should be 64"));
-        for i in 0..BLOCK_SIZE {
-            if (n >> i) & 1 == 1 {
-                res ^= A[i];
+        let mut res: Vec<u8> = vec![];
+        for block in a.chunks(8) {
+            let mut res_i = 0u64;
+            let n = u64::from_be_bytes(
+                block
+                    .try_into()
+                    .expect("u64 can be constructed only with [u8; 8]"),
+            );
+            for i in 0..64 {
+                if (n >> i) & 1 == 1 {
+                    res_i ^= A[63 - i];
+                }
             }
+
+            res.extend_from_slice(&res_i.to_be_bytes());
         }
 
-        return res.to_le_bytes().to_vec();
+        return res;
     }
 
     fn key_schedule(k: &[u8], i: usize) -> Vec<u8> {
@@ -216,11 +225,12 @@ impl Gost34_11 {
         return Self::l(&Self::p(&Self::s(&state)));
     }
 
-    fn e(k: &[u8], m: &[u8]) -> Vec<u8> {
-        let mut state = Self::xor(k, m);
+    fn e(original_k: &[u8], m: &[u8]) -> Vec<u8> {
+        let mut state = Self::xor(original_k, m);
+        let mut k: Vec<u8> = Vec::from(original_k);
         for i in 0..=11 {
             state = Self::l(&Self::p(&Self::s(&state)));
-            let k = Self::key_schedule(k, i);
+            k = Self::key_schedule(&k, i);
             state = Self::xor(&state, &k);
         }
 
@@ -228,7 +238,7 @@ impl Gost34_11 {
     }
 
     fn g(n: &[u8], m: &[u8], h: &[u8]) -> Vec<u8> {
-        let mut k: Vec<u8> = Self::xor(&h, &m);
+        let mut k: Vec<u8> = Self::xor(&h, &n);
         k = Self::l(&Self::p(&Self::s(&k)));
         let mut t = Self::e(&k, m);
         t = Self::xor(&t, h);
@@ -242,7 +252,7 @@ impl Gost34_11 {
         let mut result = vec![0u8; BLOCK_SIZE];
         let mut carry = 0u16;
 
-        for i in 0..BLOCK_SIZE {
+        for i in (0..BLOCK_SIZE).rev() {
             let sum = a[i] as u16 + b[i] as u16 + carry;
             result[i] = sum as u8;
             carry = sum >> 8;
@@ -253,7 +263,7 @@ impl Gost34_11 {
 
     fn from_u64(value: u64) -> Vec<u8> {
         let mut result = vec![0u8; BLOCK_SIZE];
-        result[..8].copy_from_slice(&value.to_le_bytes());
+        result[(BLOCK_SIZE - 8)..].copy_from_slice(&value.to_be_bytes());
         return result;
     }
 
@@ -266,9 +276,7 @@ impl Gost34_11 {
         return h;
     }
 
-    pub fn hash_512(bytes: &[u8], output_len: usize) -> Vec<u8> {
-        debug_assert_eq!(output_len, 64);
-
+    pub fn hash_512(bytes: &[u8]) -> Vec<u8> {
         let mut h = vec![0u8; BLOCK_SIZE];
         let mut n = vec![0u8; BLOCK_SIZE];
         let mut sigma = vec![0u8; BLOCK_SIZE];
@@ -286,23 +294,19 @@ impl Gost34_11 {
             end = start;
         }
 
-        if end > 0 {
-            let mut m = vec![0u8; BLOCK_SIZE];
+        let mut m = vec![0u8; BLOCK_SIZE];
 
-            m[BLOCK_SIZE - end - 1] = 0x01;
-            m[BLOCK_SIZE - end..].copy_from_slice(&bytes[..end]);
+        m[BLOCK_SIZE - end - 1] = 0x01;
+        m[BLOCK_SIZE - end..].copy_from_slice(&bytes[..end]);
 
-            h = Self::g(&n, &m, &h);
-            n = Self::add_mod_512(&n, &Self::from_u64((end * 8) as u64));
-            sigma = Self::add_mod_512(&sigma, &m);
-        }
+        h = Self::g(&n, &m, &h);
+        n = Self::add_mod_512(&n, &Self::from_u64((end * 8) as u64));
+        sigma = Self::add_mod_512(&sigma, &m);
 
         return Self::final_hash(h, n, sigma);
     }
 
-    pub fn hash_256(bytes: &[u8], output_len: usize) -> Vec<u8> {
-        debug_assert_eq!(output_len, 32);
-
+    pub fn hash_256(bytes: &[u8]) -> Vec<u8> {
         let mut h = vec![0x01u8; BLOCK_SIZE];
         let mut n = vec![0u8; BLOCK_SIZE];
         let mut sigma = vec![0u8; BLOCK_SIZE];
@@ -320,16 +324,14 @@ impl Gost34_11 {
             end = start;
         }
 
-        if end > 0 {
-            let mut m = vec![0u8; BLOCK_SIZE];
+        let mut m = vec![0u8; BLOCK_SIZE];
 
-            m[BLOCK_SIZE - end - 1] = 0x01;
-            m[BLOCK_SIZE - end..].copy_from_slice(&bytes[..end]);
+        m[BLOCK_SIZE - end - 1] = 0x01;
+        m[BLOCK_SIZE - end..].copy_from_slice(&bytes[..end]);
 
-            h = Self::g(&n, &m, &h);
-            n = Self::add_mod_512(&n, &Self::from_u64((end * 8) as u64));
-            sigma = Self::add_mod_512(&sigma, &m);
-        }
+        h = Self::g(&n, &m, &h);
+        n = Self::add_mod_512(&n, &Self::from_u64((end * 8) as u64));
+        sigma = Self::add_mod_512(&sigma, &m);
 
         h = Self::final_hash(h, n, sigma);
 

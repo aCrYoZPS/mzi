@@ -1,8 +1,6 @@
 use super::gf::{Field, Gf};
 use rand::Rng;
 
-/// A polynomial in x over GF(2^m). coeffs[i] is the coefficient of x^i and the last
-/// coefficient is never zero, so the zero polynomial has no coefficients at all.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Poly {
     coeffs: Vec<Gf>,
@@ -25,7 +23,6 @@ impl Poly {
         return Self::from_coeffs(vec![c]);
     }
 
-    /// c·x^degree.
     pub fn monomial(c: Gf, degree: usize) -> Self {
         let mut coeffs = vec![0; degree + 1];
         coeffs[degree] = c;
@@ -54,7 +51,6 @@ impl Poly {
         return self.coeffs.get(i).copied().unwrap_or(0);
     }
 
-    /// None for the zero polynomial.
     pub fn degree(&self) -> Option<usize> {
         return self.coeffs.len().checked_sub(1);
     }
@@ -71,7 +67,6 @@ impl Poly {
         return self.leading() == 1;
     }
 
-    /// Addition and subtraction coincide in characteristic 2.
     pub fn add(&self, other: &Poly) -> Poly {
         let (long, short) = if self.coeffs.len() >= other.coeffs.len() {
             (self, other)
@@ -108,7 +103,6 @@ impl Poly {
         return Self::from_coeffs(coeffs);
     }
 
-    /// In characteristic 2 the cross terms cancel: (Σ cᵢxⁱ)² = Σ cᵢ²x²ⁱ.
     pub fn square(&self, field: &Field) -> Poly {
         let mut coeffs = vec![0; (2 * self.coeffs.len()).saturating_sub(1)];
         for (i, &c) in self.coeffs.iter().enumerate() {
@@ -118,7 +112,6 @@ impl Poly {
         return Self::from_coeffs(coeffs);
     }
 
-    /// Quotient and remainder of long division; panics on a zero divisor.
     pub fn div_rem(&self, divisor: &Poly, field: &Field) -> (Poly, Poly) {
         let divisor_degree = divisor.degree().expect("division by the zero polynomial");
         if self.coeffs.len() <= divisor_degree {
@@ -147,7 +140,6 @@ impl Poly {
         return self.div_rem(modulus, field).1;
     }
 
-    /// Horner's scheme.
     pub fn eval(&self, x: Gf, field: &Field) -> Gf {
         return self
             .coeffs
@@ -164,7 +156,6 @@ impl Poly {
         return self.scale(field.inv(self.leading()), field);
     }
 
-    /// Monic greatest common divisor; gcd(0, 0) = 0.
     pub fn gcd(&self, other: &Poly, field: &Field) -> Poly {
         let mut a = self.clone();
         let mut b = other.clone();
@@ -185,9 +176,7 @@ impl Poly {
         return self.square(field).rem(modulus, field);
     }
 
-    /// The inverse modulo `modulus`, if the two are coprime.
     pub fn inv_mod(&self, modulus: &Poly, field: &Field) -> Option<Poly> {
-        // Extended Euclid keeping rᵢ ≡ vᵢ·self (mod modulus).
         let (mut r0, mut r1) = (modulus.clone(), self.rem(modulus, field));
         let (mut v0, mut v1) = (Self::zero(), Self::one());
         while !r1.is_zero() {
@@ -203,9 +192,6 @@ impl Poly {
         return Some(v0.scale(field.inv(r0.leading()), field).rem(modulus, field));
     }
 
-    /// Runs extended Euclid on (modulus, self) up to the first remainder r with
-    /// deg r ≤ stop_degree and returns (r, v) such that r ≡ v·self (mod modulus).
-    /// Each v then has deg v = deg modulus - deg(previous remainder) < deg modulus - stop_degree.
     pub fn partial_ext_gcd(
         &self,
         modulus: &Poly,
@@ -224,8 +210,6 @@ impl Poly {
         return (r1, v1);
     }
 
-    /// √x modulo an irreducible `modulus` of degree t: x^(2^(mt-1)), since the quotient ring
-    /// is then the field GF(2^(mt)).
     pub fn sqrt_x_mod(modulus: &Poly, field: &Field) -> Poly {
         let t = modulus.degree().expect("modulus must not be zero");
         let mut root = Self::x().rem(modulus, field);
@@ -236,10 +220,7 @@ impl Poly {
         return root;
     }
 
-    /// √self modulo an irreducible `modulus`, given sqrt_x = √x from `sqrt_x_mod`.
     pub fn sqrt_mod(&self, modulus: &Poly, sqrt_x: &Poly, field: &Field) -> Poly {
-        // self = even² + x·odd², where even and odd take the roots of the even and odd
-        // coefficients, so √self = even + √x·odd.
         let roots: Vec<Gf> = self.coeffs.iter().map(|&c| field.sqrt(c)).collect();
         let even = Self::from_coeffs(roots.iter().step_by(2).copied().collect());
         let odd = Self::from_coeffs(roots.iter().skip(1).step_by(2).copied().collect());
@@ -247,9 +228,6 @@ impl Poly {
         return even.add(&sqrt_x.mul(&odd, field)).rem(modulus, field);
     }
 
-    /// Ben-Or's test: a polynomial of degree n over GF(q) is irreducible iff it shares no
-    /// factor with x^(q^i) - x for i = 1..=n/2, as those products hold every irreducible
-    /// polynomial whose degree divides i.
     pub fn is_irreducible(&self, field: &Field) -> bool {
         let n = match self.degree() {
             None | Some(0) => return false,
@@ -259,7 +237,6 @@ impl Poly {
         let x = Self::x().rem(self, field);
         let mut h = x.clone();
         for _ in 0..n / 2 {
-            // h ← h^q, with q = 2^m.
             for _ in 0..field.m() {
                 h = h.square_mod(self, field);
             }
@@ -278,7 +255,6 @@ impl Poly {
         return Self::from_coeffs(coeffs);
     }
 
-    /// About one monic polynomial in `degree` is irreducible, so this takes ~degree attempts.
     pub fn random_irreducible<R: Rng>(degree: usize, rng: &mut R, field: &Field) -> Poly {
         assert!(
             degree >= 1,
@@ -292,7 +268,6 @@ impl Poly {
         }
     }
 
-    /// For instance "x^2 + α·x + α^7".
     pub fn display(&self, field: &Field) -> String {
         if self.is_zero() {
             return "0".to_string();
@@ -345,7 +320,6 @@ mod tests {
         }
     }
 
-    /// Every monic polynomial of the given degree over the field.
     fn all_monic(degree: usize, field: &Field) -> Vec<Poly> {
         let q = field.size();
         return (0..q.pow(degree as u32))
@@ -421,8 +395,6 @@ mod tests {
 
     #[test]
     fn counts_irreducible_polynomials() {
-        // The number of monic irreducible polynomials of degree n over GF(q) is
-        // (1/n)·Σ_{d | n} μ(d)·q^(n/d).
         let gf4 = Field::new(2);
         let gf16 = Field::new(4);
         let count = |degree, field: &Field| {
@@ -443,19 +415,16 @@ mod tests {
         let field = Field::new(4);
         let has_root = |p: &Poly| (0..16).any(|x| p.eval(x, &field) == 0);
 
-        // Degrees 2 and 3 are irreducible exactly when they have no roots.
         for degree in [2, 3] {
             for p in all_monic(degree, &field).iter().step_by(7) {
                 assert_eq!(p.is_irreducible(&field), !has_root(p));
             }
         }
 
-        // x² + x + α⁷ is irreducible over GF(16), x² + x + α is not.
         let alpha7 = field.alpha_pow(7);
         assert!(Poly::from_coeffs(vec![alpha7, 1, 1]).is_irreducible(&field));
         assert!(!Poly::from_coeffs(vec![field.alpha_pow(1), 1, 1]).is_irreducible(&field));
 
-        // A product of two irreducible quadratics has no roots but is reducible.
         let mut rng = rng();
         let a = Poly::random_irreducible(2, &mut rng, &field);
         let b = Poly::random_irreducible(2, &mut rng, &field);
@@ -496,7 +465,6 @@ mod tests {
     #[test]
     fn inverse_needs_coprime() {
         let field = Field::new(4);
-        // (x + 1)(x + α)
         let x_plus_1 = Poly::from_coeffs(vec![1, 1]);
         let x_plus_alpha = Poly::from_coeffs(vec![field.alpha_pow(1), 1]);
         let modulus = x_plus_1.mul(&x_plus_alpha, &field);

@@ -1,0 +1,48 @@
+@startuml
+title Блок-схема алгоритма ГОСТ 34.11-2012
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение M, длина хеш-кода 512 или 256 бит;
+note right
+  Векторы -- 512 бит, записываются от старшего байта к младшему
+  S -- замена байтов по таблице pi
+  P -- перестановка байтов tau (транспонирование матрицы 8 x 8)
+  L -- умножение каждого 64-битного слова на матрицу A
+  X(K, a) = K xor a,  LPS(a) = L(P(S(a)))
+end note
+
+if (512 бит ?) then (да)
+  :h := 00 ... 00;
+else (нет)
+  :h := 01 ... 01;
+endif
+:N := 0,  S := 0;
+while (|M| >= 512 ?) is (да)
+  :m := младшие 512 бит M;
+  :h := gN(h, m);
+  :N := N + 512 mod 2^512,  S := S + m mod 2^512;
+  :M := M без младших 512 бит;
+endwhile (нет)
+:m := 0 ... 0 || 1 || M\n(дополнение до 512 бит, выполняется всегда);
+:h := gN(h, m);
+:N := N + |M| mod 2^512,  S := S + m mod 2^512;
+:h := g0(h, N);
+:h := g0(h, S);
+note right
+  gN(h, m) = E(LPS(h xor N), m) xor h xor m
+  E(K, m) = X(K13, LPS(X(K12, ... LPS(X(K1, m)) ...)))
+  K1 = K,  Ki+1 = LPS(Ki xor Ci),  i = 1 ... 12
+end note
+if (512 бит ?) then (да)
+  :Выход: h;
+else (нет)
+  :Выход: старшие 256 бит h;
+endif
+stop
+@enduml
