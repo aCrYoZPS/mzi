@@ -1,0 +1,33 @@
+@startuml
+title Расшифрование блока
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: блок C длиной k байт, закрытый ключ (p, q, yp, yq);
+:c := число из байтов C;
+:mp := c^((p+1)/4) mod p;\nmq := c^((q+1)/4) mod q;
+:t1 := yp·p·mq;\nt2 := yq·q·mp;
+note right
+  t1 = 0 (mod p),  t1 = mq (mod q)
+  t2 = mp (mod p), t2 = 0 (mod q)
+end note
+:r1 := (t1 + t2) mod n,     r2 := n - r1;\nr3 := (t1 - t2) mod n,     r4 := n - r3;
+:j := 1;
+while (j <= 4 ?) is (да)
+  :B := байты r[j];
+  if (|B| = k-1 и B[k-2] = 01\nи B[D-R .. D-1] = B[D .. D+R-1] ?) then (да)
+    :Выход: B[0 .. D-1];
+    stop
+  else (нет)
+  endif
+  :j := j + 1;
+endwhile (нет)
+:Ошибка: блок искажён;
+stop
+
+@enduml

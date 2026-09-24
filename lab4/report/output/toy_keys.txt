@@ -1,0 +1,59 @@
+McEliece cryptosystem — input/output: file, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): g
+
+1) toy              m = 4 , n = 16  , t = 2
+2) small            m = 8 , n = 256 , t = 8
+3) original (1978)  m = 10, n = 1024, t = 50
+4) custom
+Parameters [keep current]: 4
+m (2..=16) [10]: 4
+n (up to 2^m = 16) [1024]: 20
+t [50]: 2
+Generating keys for m = 4, n = 20, t = 2...
+Error: n = 20 exceeds the field size 2^4
+
+McEliece cryptosystem — input/output: file, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): g
+
+1) toy              m = 4 , n = 16  , t = 2
+2) small            m = 8 , n = 256 , t = 8
+3) original (1978)  m = 10, n = 1024, t = 50
+4) custom
+Parameters [keep current]: 1
+Generating keys for m = 4, n = 16, t = 2...
+Done in 24.10µs
+
+McEliece cryptosystem — input/output: file, n = 16, k = 8, t = 2
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): k
+
+Public key
+  n, k, t    : 16, 8, 2
+  G' = S·G·P : 8 × 16, 16 bytes
+               10111011 10011001
+               00110010 01011101
+               10000110 00101001
+               10111000 11010011
+               10101110 10100010
+               11011010 10000000
+               00101101 11010111
+               11110000 11101111
+Private key
+  field      : GF(2^4) = GF(2)[z]/(z^4 + z + 1)
+  g(x)       : x^2 + α^9·x + α
+  support L  : α^12, α^2, α^11, 1, α^7, α^10, α^14, 0, α^9, α^5, α^8, α^6, α^3, α^13, α, α^4
+  S⁻¹        : 8 × 8, 8 bytes
+               11010010
+               00111011
+               01111101
+               01000101
+               00101001
+               10001011
+               11010110
+               00001100
+  P⁻¹        : 14, 10, 7, 12, 15, 9, 6, 1, 0, 11, 8, 3, 2, 4, 13, 5

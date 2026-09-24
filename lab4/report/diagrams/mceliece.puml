@@ -1,0 +1,66 @@
+@startuml
+title Блок-схема алгоритма Мак-Элиса\n(зашифрование и расшифрование сообщения)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение M, ключ, направление;
+note right
+  Открытый ключ: G' = S·G·P (k x n), t
+  Закрытый ключ: L, g(x), S^-1, P^-1
+  Биты байта нумеруются от младшего к старшему
+  Сложение векторов -- XOR
+end note
+
+if (зашифрование ?) then (да)
+  :M := биты M || 1 || 0 ... 0\n(дополнение до длины, кратной k);
+  :i := 1;
+  while (i <= |M| / k ?) is (да)
+    :m := i-й кусок M длины k бит;
+    :e := случайный вектор длины n\nровно с t единицами;
+    :c := m·G' + e;
+    :C[i] := c, записанный в ceil(n / 8) байт;
+    :i := i + 1;
+  endwhile (нет)
+  :Выход: C[1] || ... || C[|M| / k];
+else (нет)
+  if (|C| = 0 или |C| mod ceil(n / 8) <> 0 ?) then (да)
+    :Ошибка: неверная длина;
+    stop
+  else (нет)
+  endif
+  :i := 1;
+  while (i <= |C| / ceil(n / 8) ?) is (да)
+    :y := i-й блок C · P^-1;
+    :S(x) := сумма y[j] / (x - L[j]) mod g(x);
+    if (S(x) = 0 ?) then (да)
+    else (нет)
+      :T(x) := S(x)^-1 mod g(x)\ntau(x) := sqrt(T(x) + x) mod g(x);
+      :Расширенный алгоритм Евклида для g и tau\nдо первого остатка a степени <= t / 2:\na = b·tau mod g(x);
+      :sigma(x) := a(x)^2 + x·b(x)^2;
+      if (число корней sigma среди L[j]\nравно deg sigma ?) then (да)
+        :Инвертировать y[j]\nдля всех корней sigma(L[j]) = 0;
+      else (нет)
+        :Ошибка: блок искажён\n(больше t ошибок);
+        stop
+      endif
+    endif
+    :X[i] := (первые k бит y) · S^-1;
+    :i := i + 1;
+  endwhile (нет)
+  :M := X[1] || ... || X[|C| / ceil(n / 8)];
+  if (последняя единица M стоит на границе байта\nв пределах последних k бит ?) then (да)
+    :Отбросить последнюю единицу и нули за ней;
+  else (нет)
+    :Ошибка: неверное дополнение;
+    stop
+  endif
+  :Выход: M;
+endif
+stop
+
+@enduml

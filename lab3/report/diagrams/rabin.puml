@@ -1,0 +1,61 @@
+@startuml
+title Блок-схема алгоритма Рабина\n(зашифрование и расшифрование сообщения)
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: сообщение M, ключ, направление;
+note right
+  n = p·q, p и q простые, p mod 4 = q mod 4 = 3
+  k := длина n в байтах,  R := 16
+  D := k - R - 2 -- полезных байт в блоке
+  Числа записываются байтами от младшего к старшему
+end note
+
+if (зашифрование ?) then (да)
+  :M := M || 80 || 00 ... 00\n(дополнение до длины, кратной D);
+  :i := 1;
+  while (i <= |M| / D ?) is (да)
+    :X := i-й кусок M длины D;
+    :m := число из байтов X || последние R байт X || 01;
+    :c := m^2 mod n;
+    :C[i] := c, записанное ровно в k байт;
+    :i := i + 1;
+  endwhile (нет)
+  :Выход: C[1] || ... || C[|M| / D];
+else (нет)
+  if (|C| = 0 или |C| mod k <> 0 ?) then (да)
+    :Ошибка: неверная длина;
+    stop
+  else (нет)
+  endif
+  :i := 1;
+  while (i <= |C| / k ?) is (да)
+    :c := число из i-го блока C;
+    :mp := c^((p+1)/4) mod p;\nmq := c^((q+1)/4) mod q;
+    :t1 := yp·p·mq,   t2 := yq·q·mp\n(yp = p^(q-2) mod q,   yq = q^(p-2) mod p);
+    :r1 := (t1 + t2) mod n,   r2 := n - r1;\nr3 := (t1 - t2) mod n,   r4 := n - r3;
+    if (есть корень r длиной k-1 байт,\nстарший байт 01,\nизбыточность совпадает ?) then (да)
+      :X[i] := младшие D байт r;
+    else (нет)
+      :Ошибка: блок искажён;
+      stop
+    endif
+    :i := i + 1;
+  endwhile (нет)
+  :M := X[1] || ... || X[|C| / k];
+  if (последний ненулевой байт M = 80\nв пределах последнего блока ?) then (да)
+    :Отбросить 80 и нули за ним;
+  else (нет)
+    :Ошибка: неверное дополнение;
+    stop
+  endif
+  :Выход: M;
+endif
+stop
+
+@enduml

@@ -1,0 +1,37 @@
+McEliece cryptosystem — input/output: text, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 1
+
+Plaintext: Привет, Мак-Элис!
+  mode      : encryption
+  plaintext : 30 bytes
+  encrypted : 29548F7A750D8A3750F3DB55B59337078C78834EBA0599E7D6200476AB58B382B1682229467370D041
+    1F6EA7D970C50E7903C7616164F9C3352D4D67B0E20D29ED9B42555C037CC8ED33DB7B0A81F810C383F4A15EF83B
+    0E850D2E9BBAE9983845C5FEDD1E3F012F129A26FFF16A383EA29AF0A14F83886AE202350274F682D0 (128
+    bytes)
+
+McEliece cryptosystem — input/output: text, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 1
+
+Plaintext: Привет, Мак-Элис!
+  mode      : encryption
+  plaintext : 30 bytes
+  encrypted : 295E871AFD0D823710F3DE57F49337078C58834EBA0599E3F2300674ABD82682A068A3205473704081
+    1F6CA2D950C50E7903DF616164F1C1B54D4D6FF0E20D69ED9962571C037CC8CD33DA7B0B83F8184383B5A97E883B
+    0E010D2E9FBAE9D82847C576DD1E3F012F329E06FFF90B3036E39AF2A14F9F806EE202352254F7C2D0 (128
+    bytes)
+
+McEliece cryptosystem — input/output: text, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 2
+
+Ciphertext (hex): 29548F7A750D8A3750F3DB55B59337078C78834EBA0599E7D6200476AB58B382B1682229467370
+  D0411F6EA7D970C50E7903C7616164F9C3352D4D67B0E20D29ED9B42555C037CC8ED33DB7B0A81F810C383F4A15EF8
+  3B0E850D2E9BBAE9983845C5FEDD1E3F012F129A26FFF16A383EA29AF0A14F83886AE202350274F682D0
+  mode      : decryption
+  encrypted : 128 bytes
+  decrypted : Привет, Мак-Элис! (30 bytes)
