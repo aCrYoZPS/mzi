@@ -1,0 +1,21 @@
+@startuml
+title Зашифрование блока
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: кусок X длиной D = k - R - 2 байт, открытый ключ n;
+:B := массив из k-1 нулевых байт;
+:B[0 .. D-1] := X;
+:B[D .. D+R-1] := X[D-R .. D-1]\n(избыточность -- копия последних R байт);
+:B[k-2] := 01\n(маркер: m < n и m^2 > n);
+:m := число, записанное байтами B от младшего к старшему;
+:c := m^2 mod n;
+:Выход: c, дополненное нулями до k байт;
+stop
+
+@enduml

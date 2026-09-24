@@ -1,0 +1,22 @@
+McEliece cryptosystem — input/output: file, n = 16, k = 8, t = 2
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 3
+
+Message (8 bits, empty for random): 
+
+Encryption
+  m              : 10111000
+  m·G'           : 00101011 11000001
+  e (weight 2  ) : 00000000 11000000
+  e positions    : [8, 9]
+  c = m·G' + e   : 00101011 00000001
+Decryption
+  c·P⁻¹          : 01000111 00000001
+  syndrome S(x)  : α^10·x + α^8
+  fixed at       : [0, 11] (e·P⁻¹)
+  m·S·G          : 11000111 00010001
+  m·S (first k)  : 11000111
+  m = m·S·S⁻¹    : 10111000
+  result         : matches the message
+  block sizes    : 8 bits in, 16 bits out

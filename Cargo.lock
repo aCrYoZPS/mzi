@@ -134,8 +134,17 @@ dependencies = [
 name = "lab3"
 version = "0.1.0"
 dependencies = [
+ "common",
  "num-bigint",
  "num-prime",
+ "rand 0.8.8",
+]
+
+[[package]]
+name = "lab4"
+version = "0.1.0"
+dependencies = [
+ "common",
  "rand 0.8.8",
 ]
 

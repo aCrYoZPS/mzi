@@ -1,0 +1,28 @@
+McEliece cryptosystem — input/output: text, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): m
+
+Switched to file mode
+
+McEliece cryptosystem — input/output: file, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 1
+
+Plaintext file: plain.txt
+Output file [plain.txt.mce]: 
+  mode      : encryption
+  input     : plain.txt (1800 bytes)
+  output    : plain.txt.mce (3584 bytes)
+
+McEliece cryptosystem — input/output: file, n = 1024, k = 524, t = 50
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 2
+
+Ciphertext file: plain.txt.mce
+Output file [plain.txt]: out.txt
+  mode      : decryption
+  input     : plain.txt.mce (3584 bytes)
+  output    : out.txt (1800 bytes)

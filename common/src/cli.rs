@@ -106,16 +106,23 @@ pub fn at_least(min: usize) -> impl Fn(&[u8]) -> Result<(), String> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum IoMode {
+pub enum IoMode {
     Text,
     File,
 }
 
 impl IoMode {
-    fn name(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         match self {
             IoMode::Text => "text",
             IoMode::File => "file",
+        }
+    }
+
+    pub fn toggled(self) -> Self {
+        match self {
+            IoMode::Text => IoMode::File,
+            IoMode::File => IoMode::Text,
         }
     }
 }
@@ -173,15 +180,15 @@ pub fn parse_key(hex_key: &str) -> Result<Key<8>, String> {
     return Ok(Key(new_key));
 }
 
-fn read_file(path: &Path) -> Result<Vec<u8>, String> {
+pub fn read_file(path: &Path) -> Result<Vec<u8>, String> {
     return fs::read(path).map_err(|err| format!("cannot read {}: {err}", path.display()));
 }
 
-fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
     return fs::write(path, bytes).map_err(|err| format!("cannot write {}: {err}", path.display()));
 }
 
-fn ask_input_path(label: &str) -> Result<PathBuf, String> {
+pub fn ask_input_path(label: &str) -> Result<PathBuf, String> {
     let path = prompt(label);
     if path.is_empty() {
         return Err("no input file given".to_string());
@@ -190,7 +197,7 @@ fn ask_input_path(label: &str) -> Result<PathBuf, String> {
     return Ok(PathBuf::from(path));
 }
 
-fn ask_output_path(default: &Path) -> Result<PathBuf, String> {
+pub fn ask_output_path(default: &Path) -> Result<PathBuf, String> {
     let answer = prompt(&format!("Output file [{}]: ", default.display()));
     let path = if answer.is_empty() {
         default.to_path_buf()
@@ -211,56 +218,98 @@ fn ask_output_path(default: &Path) -> Result<PathBuf, String> {
     return Ok(path);
 }
 
-impl CipherApp {
-    fn default_output_path(&self, source: &Path, encrypt: bool) -> PathBuf {
-        if encrypt {
-            let mut name = source.as_os_str().to_os_string();
-            name.push(format!(".{}", self.encrypted_extension));
-
-            return PathBuf::from(name);
-        }
-
-        if source
-            .extension()
-            .is_some_and(|ext| ext == self.encrypted_extension)
-        {
-            return source.with_extension("");
-        }
-
+/// `file.txt` encrypts to `file.txt.<ext>`, which decrypts back to `file.txt`;
+/// any other ciphertext name decrypts to `<name>.decrypted`.
+pub fn default_output_path(source: &Path, encrypted_extension: &str, encrypt: bool) -> PathBuf {
+    if encrypt {
         let mut name = source.as_os_str().to_os_string();
-        name.push(".decrypted");
+        name.push(format!(".{encrypted_extension}"));
 
         return PathBuf::from(name);
     }
 
-    fn read_payload(
-        &self,
-        io_mode: IoMode,
-        encrypt: bool,
-    ) -> Result<(Vec<u8>, Option<PathBuf>), String> {
-        match io_mode {
-            IoMode::Text => {
-                let bytes = if encrypt {
-                    prompt("Plaintext: ").into_bytes()
-                } else {
-                    from_hex(&prompt("Ciphertext (hex): "))?
-                };
+    if source
+        .extension()
+        .is_some_and(|ext| ext == encrypted_extension)
+    {
+        return source.with_extension("");
+    }
 
-                return Ok((bytes, None));
-            }
-            IoMode::File => {
-                let path = ask_input_path(if encrypt {
-                    "Plaintext file: "
-                } else {
-                    "Ciphertext file: "
-                })?;
-                let bytes = read_file(&path)?;
+    let mut name = source.as_os_str().to_os_string();
+    name.push(".decrypted");
 
-                return Ok((bytes, Some(path)));
+    return PathBuf::from(name);
+}
+
+/// Text mode reads a plaintext line or a hex ciphertext; file mode reads the
+/// whole file and also returns its path.
+pub fn read_payload(io_mode: IoMode, encrypt: bool) -> Result<(Vec<u8>, Option<PathBuf>), String> {
+    match io_mode {
+        IoMode::Text => {
+            let bytes = if encrypt {
+                prompt("Plaintext: ").into_bytes()
+            } else {
+                from_hex(&prompt("Ciphertext (hex): "))?
+            };
+
+            return Ok((bytes, None));
+        }
+        IoMode::File => {
+            let path = ask_input_path(if encrypt {
+                "Plaintext file: "
+            } else {
+                "Ciphertext file: "
+            })?;
+            let bytes = read_file(&path)?;
+
+            return Ok((bytes, Some(path)));
+        }
+    }
+}
+
+/// Writes the output to `destination` when the input came from a file,
+/// otherwise prints it: hex for a ciphertext, text (or hex) for a plaintext.
+pub fn emit_output(
+    encrypt: bool,
+    input: &[u8],
+    output: &[u8],
+    source: Option<&Path>,
+    destination: Option<&Path>,
+) -> Result<(), String> {
+    match source {
+        Some(path) => {
+            let destination = destination.expect("a file source always has a destination");
+            write_file(destination, output)?;
+
+            println!("  input     : {} ({} bytes)", path.display(), input.len());
+            println!(
+                "  output    : {} ({} bytes)",
+                destination.display(),
+                output.len()
+            );
+        }
+        None => {
+            if encrypt {
+                println!("  plaintext : {} bytes", input.len());
+                println!("  encrypted : {} ({} bytes)", to_hex(output), output.len());
+            } else {
+                println!("  encrypted : {} bytes", input.len());
+                match String::from_utf8(output.to_vec()) {
+                    Ok(text) => println!("  decrypted : {text} ({} bytes)", output.len()),
+                    Err(_) => println!(
+                        "  decrypted : <not valid UTF-8> {} ({} bytes)",
+                        to_hex(output),
+                        output.len()
+                    ),
+                }
             }
         }
     }
 
+    return Ok(());
+}
+
+impl CipherApp {
     fn run_cipher(
         &self,
         io_mode: IoMode,
@@ -270,7 +319,7 @@ impl CipherApp {
     ) -> Result<(), String> {
         let cipher_fn = if encrypt { mode.encrypt } else { mode.decrypt };
 
-        let (input, source) = self.read_payload(io_mode, encrypt)?;
+        let (input, source) = read_payload(io_mode, encrypt)?;
         if input.is_empty() {
             return Err("nothing to process: the input is empty".to_string());
         }
@@ -285,7 +334,11 @@ impl CipherApp {
         }
 
         let destination = match &source {
-            Some(path) => Some(ask_output_path(&self.default_output_path(path, encrypt))?),
+            Some(path) => Some(ask_output_path(&default_output_path(
+                path,
+                self.encrypted_extension,
+                encrypt,
+            ))?),
             None => None,
         };
 
@@ -297,41 +350,17 @@ impl CipherApp {
             if encrypt { "encryption" } else { "decryption" }
         );
 
-        match source {
-            Some(path) => {
-                let destination = destination.expect("a file source always has a destination");
-                write_file(&destination, &output)?;
-
-                println!("  input     : {} ({} bytes)", path.display(), input.len());
-                println!(
-                    "  output    : {} ({} bytes)",
-                    destination.display(),
-                    output.len()
-                );
-            }
-            None => {
-                if encrypt {
-                    println!("  plaintext : {} bytes", input.len());
-                    println!("  encrypted : {} ({} bytes)", to_hex(&output), output.len());
-                } else {
-                    println!("  encrypted : {} bytes", input.len());
-                    match String::from_utf8(output.clone()) {
-                        Ok(text) => println!("  decrypted : {text} ({} bytes)", output.len()),
-                        Err(_) => println!(
-                            "  decrypted : <not valid UTF-8> {} ({} bytes)",
-                            to_hex(&output),
-                            output.len()
-                        ),
-                    }
-                }
-            }
-        }
-
-        return Ok(());
+        return emit_output(
+            encrypt,
+            &input,
+            &output,
+            source.as_deref(),
+            destination.as_deref(),
+        );
     }
 
     fn run_mac(&self, io_mode: IoMode, mac: &MacSpec, key: &Key<8>) -> Result<(), String> {
-        let (message, source) = self.read_payload(io_mode, true)?;
+        let (message, source) = read_payload(io_mode, true)?;
 
         let bits_input = prompt(&format!("MAC length in bits [{}]: ", mac.default_bits));
         let mac_bits = if bits_input.is_empty() {
@@ -364,7 +393,7 @@ impl CipherApp {
     }
 
     fn run_digest(&self, io_mode: IoMode, digest: &DigestSpec) -> Result<(), String> {
-        let (message, source) = self.read_payload(io_mode, true)?;
+        let (message, source) = read_payload(io_mode, true)?;
 
         let value = (digest.compute)(message.clone());
 
@@ -424,10 +453,7 @@ impl CipherApp {
 
             let result = match choice.as_str() {
                 "m" => {
-                    io_mode = match io_mode {
-                        IoMode::Text => IoMode::File,
-                        IoMode::File => IoMode::Text,
-                    };
+                    io_mode = io_mode.toggled();
                     println!("Switched to {} mode", io_mode.name());
                     Ok(())
                 }

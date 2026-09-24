@@ -1,0 +1,24 @@
+@startuml
+title Генерация ключей
+
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam monochrome true
+skinparam shadowing false
+skinparam ActivityBorderThickness 1
+
+start
+:Вход: длина простого числа b = 1536 бит;
+repeat
+  :x := случайное b-битное число;
+  :установить бит b-1 (длина ровно b бит);\nустановить биты 0 и 1 (x mod 4 = 3);
+repeat while (x простое ?) is (нет) not (да)
+:p := x;
+repeat
+  :q := новое простое число тем же способом;
+repeat while (q = p ?) is (да) not (нет)
+:n := p·q;\nyp := p^(q-2) mod q;\nyq := q^(p-2) mod p;
+:Выход: открытый ключ n,\nзакрытый ключ (p, q, yp, yq);
+stop
+
+@enduml
