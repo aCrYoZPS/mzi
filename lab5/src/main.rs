@@ -187,6 +187,7 @@ fn run_hash(io_mode: IoMode, algorithms: &[Algorithm]) -> Result<(), String> {
 }
 
 fn main() {
+    cli::init(env!("CARGO_MANIFEST_DIR"));
     let mut io_mode = IoMode::Text;
 
     loop {

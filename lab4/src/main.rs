@@ -251,6 +251,7 @@ fn trace_block(private: &PrivateKey, public: &PublicKey) -> Result<(), String> {
 }
 
 fn main() {
+    cli::init(env!("CARGO_MANIFEST_DIR"));
     let mut params = Params::ORIGINAL;
     let (mut private, mut public) = generate_keys(params).expect("the preset parameters are valid");
     let mut io_mode = IoMode::Text;

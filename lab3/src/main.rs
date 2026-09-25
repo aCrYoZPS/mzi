@@ -96,6 +96,7 @@ fn run_cipher(
 }
 
 fn main() {
+    cli::init(env!("CARGO_MANIFEST_DIR"));
     let (mut private, mut public) = generate_keys();
     let mut io_mode = IoMode::Text;
 

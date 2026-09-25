@@ -1,6 +1,14 @@
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
+use std::process;
+use std::sync::{Mutex, OnceLock};
+
+use rustyline::Context;
+use rustyline::completion::{Completer, FilenameCompleter, Pair};
+use rustyline::error::ReadlineError;
+use rustyline::history::DefaultHistory;
+use rustyline::{Editor, Helper, Highlighter, Hinter, Validator};
 
 use crate::key::Key;
 
@@ -127,14 +135,100 @@ impl IoMode {
     }
 }
 
+/// Makes relative paths resolve against the lab's own directory, whatever
+/// directory the binary was started from. Call with `env!("CARGO_MANIFEST_DIR")`.
+pub fn init(lab_dir: &str) {
+    // The directory is baked in at build time, a moved binary keeps the cwd.
+    let _ = std::env::set_current_dir(lab_dir);
+}
+
+#[derive(Helper, Hinter, Highlighter, Validator)]
+struct PromptHelper {
+    completer: FilenameCompleter,
+    /// Only file name prompts complete; Tab in text input stays inert.
+    complete_paths: bool,
+}
+
+impl Completer for PromptHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        if !self.complete_paths {
+            return Ok((pos, Vec::new()));
+        }
+
+        return self.completer.complete(line, pos, ctx);
+    }
+}
+
+type LineEditor = Editor<PromptHelper, DefaultHistory>;
+
+fn editor() -> &'static Mutex<LineEditor> {
+    static EDITOR: OnceLock<Mutex<LineEditor>> = OnceLock::new();
+
+    return EDITOR.get_or_init(|| {
+        let mut editor = LineEditor::new().expect("failed to set up the line editor");
+        editor.set_helper(Some(PromptHelper {
+            completer: FilenameCompleter::new(),
+            complete_paths: false,
+        }));
+
+        Mutex::new(editor)
+    });
+}
+
+/// Reads one line with editing and history; Ctrl-C and Ctrl-D (end of input)
+/// quit the program.
 pub fn prompt(label: &str) -> String {
+    return read_line(label, false);
+}
+
+/// Like `prompt`, with Tab completing file names.
+pub fn prompt_path(label: &str) -> String {
+    return read_line(label, true);
+}
+
+fn read_line(label: &str, complete_paths: bool) -> String {
+    // rustyline swallows the label on piped input, which breaks transcripts.
+    if !io::stdin().is_terminal() {
+        return prompt_plain(label);
+    }
+
+    let mut editor = editor().lock().expect("line editor lock poisoned");
+    if let Some(helper) = editor.helper_mut() {
+        helper.complete_paths = complete_paths;
+    }
+
+    match editor.readline(label) {
+        Ok(line) => {
+            if !line.trim().is_empty() {
+                let _ = editor.add_history_entry(line.as_str());
+            }
+
+            return line.trim_end_matches(['\r', '\n']).to_string();
+        }
+        Err(ReadlineError::Interrupted) => process::exit(130),
+        Err(ReadlineError::Eof) => process::exit(0),
+        Err(err) => panic!("failed to read stdin: {err}"),
+    }
+}
+
+fn prompt_plain(label: &str) -> String {
     print!("{label}");
     io::stdout().flush().expect("failed to flush stdout");
 
     let mut line = String::new();
-    io::stdin()
+    let read = io::stdin()
         .read_line(&mut line)
         .expect("failed to read stdin");
+    if read == 0 {
+        process::exit(0);
+    }
 
     return line.trim_end_matches(['\r', '\n']).to_string();
 }
@@ -189,7 +283,7 @@ pub fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 pub fn ask_input_path(label: &str) -> Result<PathBuf, String> {
-    let path = prompt(label);
+    let path = prompt_path(label);
     if path.is_empty() {
         return Err("no input file given".to_string());
     }
@@ -198,7 +292,7 @@ pub fn ask_input_path(label: &str) -> Result<PathBuf, String> {
 }
 
 pub fn ask_output_path(default: &Path) -> Result<PathBuf, String> {
-    let answer = prompt(&format!("Output file [{}]: ", default.display()));
+    let answer = prompt_path(&format!("Output file [{}]: ", default.display()));
     let path = if answer.is_empty() {
         default.to_path_buf()
     } else {
