@@ -117,7 +117,7 @@ impl QcMdpc {
         );
     }
 
-    pub fn encrypt_block<R: Rng>(
+    fn encrypt_block<R: Rng>(
         block: &[u8],
         key: &PublicKey,
         rng: &mut R,
@@ -177,7 +177,7 @@ impl QcMdpc {
         return ((0.0069722 * s.weight() as f64 + 13.530).floor() as usize).max(36);
     }
 
-    pub fn decode(s: &mut DenseBitVec, key: &PrivateKey) -> Option<(DenseBitVec, DenseBitVec)> {
+    fn decode(s: &mut DenseBitVec, key: &PrivateKey) -> Option<(DenseBitVec, DenseBitVec)> {
         let r = key.public.r;
         let t = key.public.t;
         let h0 = &key.h0;

@@ -1,37 +1,33 @@
 McEliece cryptosystem (QC-MDPC) — input/output: text, r = 12323, t = 134
 1) encrypt            2) decrypt
-3) trace one block
 Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 2
 
-Ciphertext (hex): 1562AD3A21B5DA7EFE7343C3E57BB860EA9E0EA0AA8061C5A929EB8ADCD24B624E7A8B21A1FB1A92C4909CE81CA9B3
-    E9786EB4926471DC057C9E764F169DE87A00A1F96BC1E0491D169BC62D88A39278 … [опущено символов: 5964] …
-    01452BA48EC235F65A64057C5D85C0DF68B08806
+Ciphertext (hex): D8A767E75977247B3C16F58782CD94C0027BC6B96741B7362F6C307683C312CBBC8928B4D3D0E90482F7A24F722CC3
+    B4F1A2D57E3EDFD0072DD54404E594D656C5D4F2BF14A10532E4855DF1D1C28A8D … [опущено символов: 5964] …
+    68E05B79A21A109159089F5BE51ACE3E1CBFC507
 Error: a block failed to decrypt: decoding failure, wrong key or damaged ciphertext
 
 McEliece cryptosystem (QC-MDPC) — input/output: text, r = 12323, t = 134
 1) encrypt            2) decrypt
-3) trace one block
 Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 2
 
-Ciphertext (hex): 1562AD3A21B5DA7EFE7343C3E57BB860EA9E0EA0AB8061C5A929EB8ADCD24B624E7A8B21A1FB1A92C4909CE81CA9B3
-    E9786EB4926471DC057C9E764F169DE87A00A1F96BC1E0491D169BC62D88A39278 … [опущено символов: 5962] …
-    2101452BA48EC235F65A64057C5D85C0DF68B088
+Ciphertext (hex): D8A767E75977247B3C16F58782CD94C0027BC6B96641B7362F6C307683C312CBBC8928B4D3D0E90482F7A24F722CC3
+    B4F1A2D57E3EDFD0072DD54404E594D656C5D4F2BF14A10532E4855DF1D1C28A8D … [опущено символов: 5962] …
+    7468E05B79A21A109159089F5BE51ACE3E1CBFC5
 Error: a block failed to decrypt: decoding failure, wrong key or damaged ciphertext
 
 McEliece cryptosystem (QC-MDPC) — input/output: text, r = 12323, t = 134
 1) encrypt            2) decrypt
-3) trace one block
 Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): g
 
 Generating keys for r = 12323, d = 71, t = 134...
-Done in 9.06ms
+Done in 7.04ms
 
 McEliece cryptosystem (QC-MDPC) — input/output: text, r = 12323, t = 134
 1) encrypt            2) decrypt
-3) trace one block
 Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 2
 
-Ciphertext (hex): 1562AD3A21B5DA7EFE7343C3E57BB860EA9E0EA0AB8061C5A929EB8ADCD24B624E7A8B21A1FB1A92C4909CE81CA9B3
-    E9786EB4926471DC057C9E764F169DE87A00A1F96BC1E0491D169BC62D88A39278 … [опущено символов: 5964] …
-    01452BA48EC235F65A64057C5D85C0DF68B08806
+Ciphertext (hex): D8A767E75977247B3C16F58782CD94C0027BC6B96641B7362F6C307683C312CBBC8928B4D3D0E90482F7A24F722CC3
+    B4F1A2D57E3EDFD0072DD54404E594D656C5D4F2BF14A10532E4855DF1D1C28A8D … [опущено символов: 5964] …
+    68E05B79A21A109159089F5BE51ACE3E1CBFC507
 Error: a block failed to decrypt: decoding failure, wrong key or damaged ciphertext
