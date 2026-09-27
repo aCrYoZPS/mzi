@@ -1,116 +1,29 @@
 #[allow(dead_code)]
 mod encryption;
 use common::cli::{self, IoMode};
-use encryption::gf::{MAX_M, MIN_M};
-use encryption::matrix::{BitVec, Matrix};
-use encryption::mceliece::*;
+use encryption::bit_vecs::DenseBitVec;
+use encryption::qc_mdpc::*;
 use rand::rngs::OsRng;
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Instant;
 
-const TITLE: &str = "McEliece cryptosystem";
+const TITLE: &str = "McEliece cryptosystem (QC-MDPC)";
 const ENCRYPTED_EXTENSION: &str = "mce";
-const PRESETS: [(&str, Params); 3] = [
-    ("toy", Params::TOY),
-    ("small", Params::SMALL),
-    ("original (1978)", Params::ORIGINAL),
-];
 const PRINT_LIMIT: usize = 64;
+const HEX_LIMIT: usize = 32;
 
-fn generate_keys(params: Params) -> Result<(PrivateKey, PublicKey), String> {
+fn generate_keys() -> (PrivateKey, PublicKey) {
     println!(
-        "Generating keys for m = {}, n = {}, t = {}...",
-        params.m, params.n, params.t
+        "Generating keys for r = {}, d = {}, t = {}...",
+        CRYPTO_PARAMS.r(),
+        CRYPTO_PARAMS.d(),
+        CRYPTO_PARAMS.t()
     );
     let start = Instant::now();
-    let keys = McEliece::keygen(params)?;
+    let keys = QcMdpc::keygen(CRYPTO_PARAMS);
     println!("Done in {:.2?}", start.elapsed());
 
-    return Ok(keys);
-}
-
-fn parse_number(label: &str, default: usize) -> Result<usize, String> {
-    let answer = cli::prompt(&format!("{label} [{default}]: "));
-    if answer.is_empty() {
-        return Ok(default);
-    }
-
-    return answer
-        .trim()
-        .parse()
-        .map_err(|_| format!("{label} expects a non-negative integer"));
-}
-
-fn read_params(current: Params) -> Result<Params, String> {
-    for (idx, (name, p)) in PRESETS.iter().enumerate() {
-        println!(
-            "{}) {name:<16} m = {:<2}, n = {:<4}, t = {}",
-            idx + 1,
-            p.m,
-            p.n,
-            p.t
-        );
-    }
-    println!("{}) custom", PRESETS.len() + 1);
-
-    let choice = cli::prompt("Parameters [keep current]: ");
-    if choice.is_empty() {
-        return Ok(current);
-    }
-    match choice.parse::<usize>() {
-        Ok(idx) if (1..=PRESETS.len()).contains(&idx) => return Ok(PRESETS[idx - 1].1),
-        Ok(idx) if idx == PRESETS.len() + 1 => {}
-        _ => return Err(format!("unknown choice: {choice:?}")),
-    }
-
-    let m = parse_number(&format!("m ({MIN_M}..={MAX_M})"), current.m as usize)?;
-    let n = parse_number(
-        &format!("n (up to 2^m = {})", 1usize << m.min(MAX_M as usize)),
-        current.n,
-    )?;
-    let t = parse_number("t", current.t)?;
-
-    return Ok(Params { m: m as u32, n, t });
-}
-
-fn field_polynomial(modulus: u32) -> String {
-    let terms: Vec<String> = (0..u32::BITS)
-        .rev()
-        .filter(|i| modulus >> i & 1 == 1)
-        .map(|i| match i {
-            0 => "1".to_string(),
-            1 => "z".to_string(),
-            _ => format!("z^{i}"),
-        })
-        .collect();
-
-    return terms.join(" + ");
-}
-
-fn grouped(v: &BitVec) -> String {
-    let bits = v.to_bit_string();
-    let groups: Vec<&str> = bits
-        .as_bytes()
-        .chunks(8)
-        .map(|chunk| std::str::from_utf8(chunk).unwrap())
-        .collect();
-
-    return groups.join(" ");
-}
-
-fn print_matrix(label: &str, matrix: &Matrix) {
-    let (rows, cols) = (matrix.row_count(), matrix.col_count());
-    println!(
-        "  {label:<11}: {rows} × {cols}, {} bytes",
-        (rows * cols).div_ceil(8)
-    );
-    if cols > PRINT_LIMIT || rows > PRINT_LIMIT {
-        return;
-    }
-
-    for row in matrix.rows() {
-        println!("  {:<11}  {}", "", grouped(row));
-    }
+    return keys;
 }
 
 fn print_list<T: ToString>(label: &str, items: &[T]) {
@@ -126,33 +39,33 @@ fn print_list<T: ToString>(label: &str, items: &[T]) {
         String::new()
     };
 
-    println!("  {label:<11}: {}{tail}", shown.join(", "));
+    println!("  {label:<14}: {}{tail}", shown.join(", "));
+}
+
+fn print_dense(label: &str, v: &DenseBitVec) {
+    let bytes = v.to_bytes();
+    let shown = cli::to_hex(&bytes[..bytes.len().min(HEX_LIMIT)]);
+    let tail = if bytes.len() > HEX_LIMIT { "…" } else { "" };
+
+    println!(
+        "  {label:<14}: {shown}{tail} (weight {}, {} bytes)",
+        v.weight(),
+        bytes.len()
+    );
 }
 
 fn print_keys(private: &PrivateKey, public: &PublicKey) {
-    let code = private.code();
-    let field = code.field();
+    let half = public.r().div_ceil(8);
 
-    println!("Public key");
-    println!(
-        "  n, k, t    : {}, {}, {}",
-        public.n(),
-        public.k(),
-        public.t()
-    );
-    print_matrix("G' = S·G·P", public.matrix());
+    println!("Public key ({} bytes)", 2 * half);
+    println!("  r, t          : {}, {}", public.r(), public.t());
+    print_dense("A = a", public.a());
+    print_dense("B = a·q", public.b());
 
     println!("Private key");
-    println!(
-        "  field      : GF(2^{}) = GF(2)[z]/({})",
-        field.m(),
-        field_polynomial(field.modulus())
-    );
-    println!("  g(x)       : {}", code.g().display(field));
-    let support: Vec<String> = code.support().iter().map(|&a| field.display(a)).collect();
-    print_list("support L", &support);
-    print_matrix("S⁻¹", private.s_inv());
-    print_list("P⁻¹", private.p_inv().as_slice());
+    print_list("supp(h0)", private.h0().positions());
+    print_list("supp(h1)", private.h1().positions());
+    print_dense("a⁻¹", private.a_inv());
 }
 
 fn run_cipher(
@@ -175,16 +88,20 @@ fn run_cipher(
         None => None,
     };
 
+    let start = Instant::now();
     let output = if encrypt {
-        McEliece::encrypt(input.clone(), public)
+        QcMdpc::encrypt(&input, public)
     } else {
-        McEliece::decrypt(input.clone(), private)?
+        QcMdpc::decrypt(&input, private).ok_or(
+            "a block failed to decrypt: decoding failure, wrong key or damaged ciphertext",
+        )?
     };
 
     println!(
         "  mode      : {}",
         if encrypt { "encryption" } else { "decryption" }
     );
+    println!("  time      : {:.2?}", start.elapsed());
 
     return cli::emit_output(
         encrypt,
@@ -196,73 +113,89 @@ fn run_cipher(
 }
 
 fn trace_block(private: &PrivateKey, public: &PublicKey) -> Result<(), String> {
-    let (n, k) = (public.n(), public.k());
+    let r = public.r();
+    let k = r / 8;
     let mut rng = StdRng::from_rng(&mut OsRng).unwrap();
 
-    let answer = cli::prompt(&format!("Message ({k} bits, empty for random): "));
-    let message = if answer.trim().is_empty() {
-        BitVec::random(k, &mut rng)
+    let answer = cli::prompt(&format!("Message (up to {k} bytes, empty for random): "));
+    let block = if answer.is_empty() {
+        (0..k).map(|_| rng.gen_range(0..=u8::MAX)).collect()
     } else {
-        BitVec::from_bit_string(&answer)?
+        answer.into_bytes()
     };
-    if message.len() != k {
-        return Err(format!("expected {k} bits, got {}", message.len()));
+    if block.len() > k {
+        return Err(format!("expected at most {k} bytes, got {}", block.len()));
     }
     println!();
 
-    let code = private.code();
-    let encoded = public.matrix().vec_mul(&message);
-    let cipher = McEliece::encrypt_block(&message, public, &mut rng);
-    let e = cipher.xor(&encoded);
-    let positions: Vec<usize> = e.iter_ones().collect();
+    let m = DenseBitVec::from_bytes(r, &block);
+    let (c0, c1) = QcMdpc::encrypt_block(&block, public, &mut rng);
+    let mut e0 = c0.xor(&m.mul(public.a()));
+    let mut e1 = c1.xor(&m.mul(public.b()));
 
     println!("Encryption");
-    println!("  m              : {}", grouped(&message));
-    println!("  m·G'           : {}", grouped(&encoded));
-    println!("  e (weight {:<3}) : {}", e.weight(), grouped(&e));
-    println!("  e positions    : {positions:?}");
-    println!("  c = m·G' + e   : {}", grouped(&cipher));
+    print_dense("m", &m);
+    print_list("supp(e0)", &e0.support());
+    print_list("supp(e1)", &e1.support());
+    println!("  |e0| + |e1|   : {}", e0.weight() + e1.weight());
+    print_dense("c0 = m·A + e0", &c0);
+    print_dense("c1 = m·B + e1", &c1);
 
-    let unpermuted = private.p_inv().apply(&cipher);
-    let syndrome = code.syndrome(&unpermuted);
-    let codeword = code.decode(&unpermuted)?;
-    let fixed: Vec<usize> = unpermuted.xor(&codeword).iter_ones().collect();
-    let message_s = code.message(&codeword);
-    let decrypted = private.s_inv().vec_mul(&message_s);
-
+    let mut s = private.h0().mul(&c0).xor(&private.h1().mul(&c1));
     println!("Decryption");
-    println!("  c·P⁻¹          : {}", grouped(&unpermuted));
-    println!("  syndrome S(x)  : {}", syndrome.display(code.field()));
-    println!("  fixed at       : {fixed:?} (e·P⁻¹)");
-    println!("  m·S·G          : {}", grouped(&codeword));
-    println!("  m·S (first k)  : {}", grouped(&message_s));
-    println!("  m = m·S·S⁻¹    : {}", grouped(&decrypted));
+    print_dense("syndrome s", &s);
+
+    let start = Instant::now();
+    let Some((found0, found1)) = QcMdpc::decode(&mut s, private) else {
+        println!("  decoder       : FAILURE after {:.2?}", start.elapsed());
+        return Ok(());
+    };
+    println!("  decoder       : done in {:.2?}", start.elapsed());
+
+    e0.xor_assign(&found0);
+    e1.xor_assign(&found1);
     println!(
-        "  result         : {}",
-        if decrypted == message {
+        "  errors found  : {}",
+        if e0.is_zero() && e1.is_zero() {
+            "all of them, exactly"
+        } else {
+            "MISMATCH"
+        }
+    );
+
+    let mut masked = c0.clone();
+    masked.xor_assign(&found0);
+    let decrypted = masked.mul(private.a_inv());
+    print_dense("decrypted m", &decrypted);
+    println!(
+        "  result        : {}",
+        if decrypted == m {
             "matches the message"
         } else {
             "MISMATCH"
         }
     );
-    println!("  block sizes    : {k} bits in, {n} bits out");
+    println!("  block sizes   : {r} bits in, {} bits out", 2 * r);
+
+    // проверка разреженного ключа: h0 должен восстанавливаться из открытого q
+    let q = private.a_inv().mul(public.b());
+    let h0_ok = private.h1().mul(&q) == DenseBitVec::from(private.h0());
+    println!("  h1·q = h0     : {}", if h0_ok { "yes" } else { "NO" });
 
     return Ok(());
 }
 
 fn main() {
     cli::init(env!("CARGO_MANIFEST_DIR"));
-    let mut params = Params::ORIGINAL;
-    let (mut private, mut public) = generate_keys(params).expect("the preset parameters are valid");
+    let (mut private, mut public) = generate_keys();
     let mut io_mode = IoMode::Text;
 
     loop {
         println!();
         println!(
-            "{TITLE} — input/output: {}, n = {}, k = {}, t = {}",
+            "{TITLE} — input/output: {}, r = {}, t = {}",
             io_mode.name(),
-            public.n(),
-            public.k(),
+            public.r(),
             public.t()
         );
         println!("{:<22}2) decrypt", "1) encrypt");
@@ -286,11 +219,10 @@ fn main() {
                 print_keys(&private, &public);
                 Ok(())
             }
-            "g" => read_params(params).and_then(|new_params| {
-                (private, public) = generate_keys(new_params)?;
-                params = new_params;
+            "g" => {
+                (private, public) = generate_keys();
                 Ok(())
-            }),
+            }
             "q" => break,
             _ => Err(format!("unknown choice: {choice:?}")),
         };

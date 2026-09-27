@@ -1,11 +1,11 @@
-McEliece cryptosystem — input/output: text, n = 1024, k = 524, t = 50
+McEliece cryptosystem (QC-MDPC) — input/output: text, r = 12323, t = 134
 1) encrypt            2) decrypt
 3) trace one block
 Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): m
 
 Switched to file mode
 
-McEliece cryptosystem — input/output: file, n = 1024, k = 524, t = 50
+McEliece cryptosystem (QC-MDPC) — input/output: file, r = 12323, t = 134
 1) encrypt            2) decrypt
 3) trace one block
 Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 1
@@ -13,10 +13,11 @@ Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 
 Plaintext file: plain.txt
 Output file [plain.txt.mce]: 
   mode      : encryption
-  input     : plain.txt (1800 bytes)
-  output    : plain.txt.mce (3584 bytes)
+  time      : 6.95ms
+  input     : plain.txt (7470 bytes)
+  output    : plain.txt.mce (15410 bytes)
 
-McEliece cryptosystem — input/output: file, n = 1024, k = 524, t = 50
+McEliece cryptosystem (QC-MDPC) — input/output: file, r = 12323, t = 134
 1) encrypt            2) decrypt
 3) trace one block
 Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): 2
@@ -24,5 +25,13 @@ Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 
 Ciphertext file: plain.txt.mce
 Output file [plain.txt]: out.txt
   mode      : decryption
-  input     : plain.txt.mce (3584 bytes)
-  output    : out.txt (1800 bytes)
+  time      : 46.95ms
+  input     : plain.txt.mce (15410 bytes)
+  output    : out.txt (7470 bytes)
+
+McEliece cryptosystem (QC-MDPC) — input/output: file, r = 12323, t = 134
+1) encrypt            2) decrypt
+3) trace one block
+Choice (or 'm' to switch text/file mode, 'k' to see keys, 'g' to generate keys, 'q' to quit): m
+
+Switched to text mode
