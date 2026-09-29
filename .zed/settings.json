@@ -1,0 +1,41 @@
+// Project-local Zed settings for mzi.
+//
+// Background preview: tinymist runs the preview server inside the language
+// server process, so it renders from the in-memory buffer and updates as you
+// type — no save required. A standalone `tinymist preview` process cannot do
+// that: it has no access to the buffer and only sees the file on disk.
+//
+// The port has to live here rather than in the global settings.json because
+// it is a single fixed socket. Two projects sharing one port means the second
+// project's tinymist dies on AddrInUse and that project is left with no
+// language server at all — no hints, no formatter, no diagnostics — while
+// <leader>t p silently shows the FIRST project's document.
+//
+// Ports in use, keep distinct:
+//   23635  mzi
+//   23636  trpo
+//
+// The server exits when the project closes (tinymist lsp quits once its stdin
+// is closed), so the port is released with it and nothing is left behind.
+{
+    "lsp": {
+        "tinymist": {
+            "initialization_options": {
+                "preview": {
+                    "background": {
+                        "enabled": true,
+                        // Overriding args replaces the default array wholesale,
+                        // so --data-plane-host has to be repeated here.
+                        //
+                        // --invert-colors=never pins the preview to the paper it
+                        // will actually print as, regardless of system theme.
+                        "args": [
+                            "--data-plane-host=127.0.0.1:23635",
+                            "--invert-colors=never",
+                        ],
+                    },
+                },
+            },
+        },
+    },
+}
