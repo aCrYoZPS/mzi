@@ -1,0 +1,30 @@
+// Project-local Zed tasks for mzi.
+//
+// Points a browser at this project's background preview (see .zed/settings.json
+// for why the port is per-project). The preview server is already running inside
+// tinymist — this only opens a tab on it, so there is no process to clean up.
+//
+// The task itself is silent: reveal "never" keeps the terminal panel from
+// popping open, hide "always" drops the tab as soon as it is done, and the two
+// show_* flags suppress the echoed command and the exit-code summary. Nothing
+// here is worth watching — it is one browser call that exits immediately.
+//
+// To actually debug the preview, the terminal is the wrong place anyway: the
+// server lives inside tinymist, so its output is in the language server log
+// (command palette -> "debug: open language server logs"). If you do want this
+// task visible for a moment, flip hide to "never".
+//
+// stdlib `webbrowser` does the OS dispatch, wrapping the same explorer / open /
+// xdg-open each platform wants. The interpreter is `python`, not `python3`: on
+// Windows `python3` resolves to the Microsoft Store stub and errors out.
+[
+  {
+    "label": "Typst: Open Preview",
+    "command": "python",
+    "args": ["-m", "webbrowser", "-t", "http://127.0.0.1:23635/"],
+    "reveal": "never",
+    "hide": "always",
+    "show_summary": false,
+    "show_command": false
+  },
+]
