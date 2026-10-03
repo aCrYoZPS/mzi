@@ -331,7 +331,12 @@ mod tests {
             let encrypted = QcMdpc::encrypt(message, &public);
             // дополнение всегда есть: len + 1 байт, округлённые вверх до блоков по k
             let blocks = (message.len() + 1).div_ceil(k);
-            assert_eq!(encrypted.len(), blocks * 2 * half, "len = {}", message.len());
+            assert_eq!(
+                encrypted.len(),
+                blocks * 2 * half,
+                "len = {}",
+                message.len()
+            );
             assert_eq!(
                 QcMdpc::decrypt(&encrypted, &private).as_ref(),
                 Some(message),

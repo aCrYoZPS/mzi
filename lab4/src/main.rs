@@ -90,9 +90,8 @@ fn run_cipher(
     let output = if encrypt {
         QcMdpc::encrypt(&input, public)
     } else {
-        QcMdpc::decrypt(&input, private).ok_or(
-            "a block failed to decrypt: decoding failure, wrong key or damaged ciphertext",
-        )?
+        QcMdpc::decrypt(&input, private)
+            .ok_or("a block failed to decrypt: decoding failure, wrong key or damaged ciphertext")?
     };
 
     println!(
